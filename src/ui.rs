@@ -18,7 +18,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::misc::PROJECT_DIR;
-use pk_edit::data_structure::pokemon::{transpose_item, Gender, Pokemon, Pokerus};
+use pk_edit::data_structure::pokemon::{transpose_item, Gender, Pokemon, Pokerus, Stats};
 use pk_edit::SaveFile;
 
 const SCALE: f32 = 0.6;
@@ -96,7 +96,7 @@ impl Application for State {
                 self.file_path = Some(path);
                 self.save_data = SaveFile::new(&results);
                 self.party = self.save_data.get_party();
-                self.current_pc = (0, self.save_data.get_box(0));
+                self.current_pc = (0, self.save_data.pc_box(0));
 
                 Command::none()
             }
@@ -129,6 +129,9 @@ impl Application for State {
                     if index < 13 {
                         self.current_pc = (index + 1, self.save_data.pc_box(index + 1));
                     }
+                    else {
+                        self.current_pc = (0, self.save_data.pc_box(0));
+                    }
                 }
                 Command::none()
             }
@@ -136,6 +139,9 @@ impl Application for State {
                 let (index, _) = self.current_pc;
                 if index > 0 {
                     self.current_pc = (index - 1, self.save_data.pc_box(index - 1));
+                }
+                else {
+                    self.current_pc = (13, self.save_data.pc_box(13));
                 }
                 Command::none()
             }
@@ -498,7 +504,7 @@ fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         label,
         dex_species_lang,
         pokemon_info_typing(pokemon.typing()),
-        StatBar {},
+        stats(pokemon.stats(), pokemon.level()),
         iced::widget::Space::with_height(Length::Fill),
         nature,
         ability,
@@ -512,6 +518,92 @@ fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     .align_y(iced::alignment::Vertical::Top)
     .align_x(iced::alignment::Horizontal::Center)
     .into()
+}
+
+fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
+    let scale = 0.45;
+    let hp = stats.hp(level);
+    let attack = stats.attack(level);
+    let defense = stats.defense(level);
+    let sp_attack = stats.sp_attack(level);
+    let sp_defense = stats.sp_defense(level);
+    let speed = stats.speed(level);
+    let labels_width = 70;
+
+    let column = column![
+        row![
+            iced::widget::Space::with_width(Length::Fill),
+            text("EV"),
+            text("IV"),
+            iced::widget::Space::with_width(20),
+        ]
+        .spacing(5)
+        .align_items(Alignment::Center),
+        row![
+            text("HP:").width(labels_width),
+            stat_bar(hp as f32 * scale),
+            text(hp),
+            iced::widget::Space::with_width(Length::Fill),
+            text(stats.hp_ev()),
+            text(stats.hp_iv()),
+        ]
+        .spacing(5)
+        .align_items(Alignment::Center),
+        row![
+            text("Attack:").width(labels_width),
+            stat_bar(attack as f32 * scale),
+            text(attack),
+            iced::widget::Space::with_width(Length::Fill),
+            text(stats.attack_ev()),
+            text(stats.attack_iv()),
+        ]
+        .spacing(5)
+        .align_items(Alignment::Center),
+        row![
+            text("Defense:").width(labels_width),
+            stat_bar(defense as f32 * scale),
+            text(defense),
+            iced::widget::Space::with_width(Length::Fill),
+            text(stats.defense_ev()),
+            text(stats.defense_iv()),
+        ]
+        .spacing(5)
+        .align_items(Alignment::Center),
+        row![
+            text("Sp. Atk:").width(labels_width),
+            stat_bar(sp_attack as f32 * scale),
+            text(sp_attack),
+            iced::widget::Space::with_width(Length::Fill),
+            text(stats.sp_attack_ev()),
+            text(stats.sp_attack_iv()),
+        ]
+        .spacing(5)
+        .align_items(Alignment::Center),
+        row![
+            text("Sp. Def:").width(labels_width),
+            stat_bar(sp_defense as f32 * scale),
+            text(sp_defense),
+            iced::widget::Space::with_width(Length::Fill),
+            text(stats.sp_defense_ev()),
+            text(stats.sp_defense_iv()),
+        ]
+        .spacing(5)
+        .align_items(Alignment::Center),
+        row![
+            text("Speed:").width(labels_width),
+            stat_bar(speed as f32 * scale),
+            text(speed),
+            iced::widget::Space::with_width(Length::Fill),
+            text(stats.speed_ev()),
+            text(stats.speed_iv()),
+        ]
+        .spacing(5)
+        .align_items(Alignment::Center),
+    ]
+    .padding([0, 10]) // top/bottom left/right
+    .spacing(5);
+
+    container(column).width(WINDOW_WIDTH * 0.33).into()
 }
 
 fn info_moves(moves: Vec<(String, String, u8, u8)>) -> Element<'static, Message> {
@@ -838,27 +930,24 @@ async fn write_file(path: PathBuf, contents: Option<Arc<Vec<u8>>>) -> Result<(),
     Ok(())
 }
 
-fn stat_bar() -> StatBar {
-    StatBar {}
+fn stat_bar(width: f32) -> StatBar {
+    StatBar::new(width)
 }
 
 struct StatBar {
-    /*size: f32,
-    radius: [f32; 4],
+    size: iced::Size,
+    /*radius: [f32; 4],
     border_width: f32,
     shadow: Shadow,*/
 }
 
-/*impl StatBar {
-    pub fn new(size: f32, radius: [f32; 4], border_width: f32, shadow: Shadow) -> Self {
+impl StatBar {
+    pub fn new(width: f32) -> Self {
         Self {
-            size,
-            radius,
-            border_width,
-            shadow,
+            size: Size::new(width, 15.0),
         }
     }
-}*/
+}
 
 impl<Message, Renderer> Widget<Message, Theme, Renderer> for StatBar
 where
@@ -877,7 +966,7 @@ where
         _renderer: &Renderer,
         _limits: &layout::Limits,
     ) -> layout::Node {
-        layout::Node::new(Size::new(150.0, 15.0))
+        layout::Node::new(self.size)
     }
 
     fn draw(
@@ -890,17 +979,33 @@ where
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
+        let color = match self.size.width {
+            val if val >= 150.0 => color!(0x00c2b8),
+            val if val >= 120.0 => color!(0x23cd5e),
+            val if val >= 90.0 => color!(0xa0e515),
+            val if val >= 60.0 => color!(0xffdd57),
+            _ => color!(0xff7f0f),
+        };
+
+        let border_color = match self.size.width {
+            val if val >= 150.0 => color!(0x00a59d),
+            val if val >= 120.0 => color!(0x1eaf50),
+            val if val >= 90.0 => color!(0x88c312),
+            val if val >= 60.0 => color!(0xd9bc4a),
+            _ => color!(0xd96c0d),
+        };
+
         renderer.fill_quad(
             renderer::Quad {
                 bounds: layout.bounds(),
                 border: Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
+                    color: border_color,
+                    width: 1.0,
                     radius: 10.0.into(),
                 },
                 shadow: Shadow::default(),
             },
-            Color::from_rgb(0.0, 0.2, 0.4),
+            color,
         );
     }
 }
