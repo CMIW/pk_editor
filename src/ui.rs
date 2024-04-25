@@ -456,11 +456,16 @@ fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     .spacing(20)
     .padding([5, 10, 5, 15]); // top, right, bottom, left
 
-    let pid = container(row![
+    let pid_friendship = container(row![
         row![
             text("PID").style(iced::theme::Text::Color(color!(0xffcc00))),
-            iced::widget::Space::with_width(5),
-            text(pokemon.personality_value())
+            iced::widget::Space::with_width(30),
+            text(format!("{:X}", pokemon.personality_value()))
+        ].width((WINDOW_WIDTH * 0.33) / 2.0),
+        row![
+            text("Friendship").style(iced::theme::Text::Color(color!(0xffcc00))),
+            iced::widget::Space::with_width(30),
+            text(pokemon.friendship()),
         ].width((WINDOW_WIDTH * 0.33) / 2.0),
     ])
     .width(WINDOW_WIDTH * 0.33)
@@ -500,19 +505,12 @@ fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         image("").height(30)
     };
 
-    let item_friendship = container(row![
-        row![
-            text("Held Item").style(iced::theme::Text::Color(color!(0xffcc00))),
-            iced::widget::Space::with_width(5),
-            item_image,
-            iced::widget::Space::with_width(5),
-            text(pokemon.held_item())
-        ].width((WINDOW_WIDTH * 0.33) / 2.0),
-        row![
-            text("Friendship").style(iced::theme::Text::Color(color!(0xffcc00))),
-            iced::widget::Space::with_width(30),
-            text(pokemon.friendship()),
-        ].width((WINDOW_WIDTH * 0.33) / 2.0),
+    let item = container(row![
+        text("Held Item").style(iced::theme::Text::Color(color!(0xffcc00))),
+        iced::widget::Space::with_width(5),
+        item_image,
+        iced::widget::Space::with_width(5),
+        text(pokemon.held_item())
     ])
     .width(WINDOW_WIDTH * 0.33)
     .height(40.0)
@@ -528,9 +526,9 @@ fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         pokemon_info_typing(pokemon.typing()),
         stats(pokemon.stats(), pokemon.level()),
         iced::widget::Space::with_height(Length::Fill),
-        pid,
+        pid_friendship,
         nature_ability,
-        item_friendship,
+        item,
         moves,
         row![].height(40)
     ])
