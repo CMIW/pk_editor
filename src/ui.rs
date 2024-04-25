@@ -56,6 +56,7 @@ pub enum Message {
     SelectedPokemon(Pokemon),
     Increment,
     Decrement,
+    LevelInputChanged(String)
 }
 
 impl Application for State {
@@ -143,6 +144,11 @@ impl Application for State {
                 else {
                     self.current_pc = (13, self.save_data.pc_box(13));
                 }
+                Command::none()
+            }
+            Message::LevelInputChanged(level) => {
+                self.selected_pokemon;
+                println!("{level}");
                 Command::none()
             }
             _ => Command::none(),
@@ -428,7 +434,7 @@ fn level(level: u8) -> Element<'static, Message> {
 }
 
 fn input_level(level: u8) -> Element<'static, Message> {
-    container(row![text("Lv. "), text_input("", &level.to_string())])
+    container(row![text("Lv. "), text_input(&level.to_string(), &level.to_string()).on_input(Message::LevelInputChanged)])
         .width(80.0)
         .height(26.0)
         .center_x()
@@ -449,6 +455,18 @@ fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     ]
     .spacing(20)
     .padding([5, 10, 5, 15]); // top, right, bottom, left
+
+    let friendship = container(row![
+        text("Friendship").style(iced::theme::Text::Color(color!(0xffcc00))),
+        iced::widget::Space::with_width(60),
+        text(pokemon.friendship())
+    ])
+    .width(WINDOW_WIDTH * 0.33)
+    .height(40.0)
+    .align_y(iced::alignment::Vertical::Center)
+    .align_x(iced::alignment::Horizontal::Left)
+    .padding([5, 15])
+    .style(pokemon_info_appearance());
 
     let nature = container(row![
         text("Nature").style(iced::theme::Text::Color(color!(0xffcc00))),
@@ -506,6 +524,7 @@ fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         pokemon_info_typing(pokemon.typing()),
         stats(pokemon.stats(), pokemon.level()),
         iced::widget::Space::with_height(Length::Fill),
+        friendship,
         nature,
         ability,
         item,
@@ -521,7 +540,12 @@ fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
 }
 
 fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
-    let scale = 0.45;
+    let (_, highest_stat) = stats.highest_stat(level);
+    let scale = if highest_stat >= 400 {
+        0.30
+    } else {
+        0.45
+    };
     let hp = stats.hp(level);
     let attack = stats.attack(level);
     let defense = stats.defense(level);
@@ -535,7 +559,6 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             iced::widget::Space::with_width(Length::Fill),
             text("EV"),
             text("IV"),
-            iced::widget::Space::with_width(20),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
