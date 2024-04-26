@@ -10,12 +10,9 @@ edition = "2021"
 #cargo-watch = "8.5.2"
 iced = { version = "0.12.1", features = ["lazy", "advanced", "tokio", "image", "debug"] }
 tokio = { version = "1.37.0", features = ["fs"] }
-thiserror = "1.0.58"
 rfd = "0.14.1"
 include_dir = "0.7.3"
-byteorder = "1.5.0"
-csv = "1.3.0"
-lazy_static = "1.4.0"
+thiserror = "1.0.59"
 pk_edit = { path = "/home/medaka/Projects/Rust/pk_edit"}
 
 [build-dependencies]
