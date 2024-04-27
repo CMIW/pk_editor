@@ -1,0 +1,14 @@
+[package]
+name = "pk_editor"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+iced = { version = "0.12.1", features = ["lazy", "advanced", "tokio", "image", "debug"] }
+tokio = { version = "1.37.0", features = ["fs"] }
+rfd = "0.14.1"
+thiserror = "1.0.59"
+include_dir = "0.7.3"
+pk_edit = { path = "/home/medaka/Projects/Rust/pk_edit"}

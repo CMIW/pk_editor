@@ -1,0 +1,218 @@
+use iced::application::Application;
+use iced::executor;
+use iced::widget::{button, column, container, row};
+use iced::{Command, Element, Size, Theme};
+
+use iced::Settings;
+
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use pk_editor::error::Error;
+use pk_editor::message::Message;
+use pk_editor::misc::{WINDOW_HEIGHT, WINDOW_WIDTH};
+use pk_editor::party::party;
+use pk_editor::pc::pc_box;
+use pk_editor::pokemon_info::pokemon_info;
+
+use pk_edit::data_structure::pokemon::{Pokemon, Pokerus};
+use pk_edit::{SaveFile, StorageType};
+
+fn main() -> iced::Result {
+    State::run(Settings {
+        window: iced::window::Settings {
+            size: Size::new(WINDOW_WIDTH, WINDOW_HEIGHT),
+            resizable: false,
+            ..iced::window::Settings::default()
+        },
+        ..Settings::default()
+    })
+}
+
+pub struct State {
+    error: Option<Error>,
+    save_file: SaveFile,
+    party: Vec<Pokemon>,
+    current_pc: Vec<Pokemon>,
+    current_pc_index: usize,
+    selected_pokemon: Pokemon,
+    selected_pokemon_storage: StorageType,
+}
+
+impl Application for State {
+    type Flags = ();
+    type Theme = Theme;
+    type Message = Message;
+    type Executor = executor::Default;
+
+    fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
+        (
+            State {
+                error: None,
+                save_file: SaveFile::default(),
+                party: vec![Pokemon::default(); 6],
+                current_pc: vec![Pokemon::default(); 30],
+                current_pc_index: 0,
+                selected_pokemon: Pokemon::default(),
+                selected_pokemon_storage: StorageType::None,
+            },
+            Command::none(),
+        )
+    }
+
+    fn title(&self) -> String {
+        String::from("PK_Edit")
+    }
+
+    fn update(&mut self, message: Message) -> Command<Message> {
+        match message {
+            Message::OpenFile => Command::perform(pick_file(), Message::FileOpened),
+            Message::SaveFile => Command::perform(pick_file(), Message::FileSaved),
+            Message::FileOpened(Ok(path)) => Command::perform(load_file(path), Message::LoadFile),
+            Message::FileOpened(Err(error)) => {
+                self.error = Some(error);
+                Command::none()
+            }
+            Message::FileSaved(Ok(path)) => Command::perform(
+                write_file(path, Some(Arc::new(self.save_file.raw_data()))),
+                Message::WriteFile,
+            ),
+            Message::FileSaved(Err(error)) => {
+                self.error = Some(error);
+                Command::none()
+            }
+            Message::LoadFile(Ok(results)) => {
+                self.save_file = SaveFile::new(&results);
+                self.current_pc_index = 0;
+                self.selected_pokemon = Pokemon::default();
+                self.selected_pokemon_storage = StorageType::None;
+
+                self.update(Message::UpdateChanges)
+            }
+            Message::LoadFile(Err(error)) => {
+                self.error = Some(error);
+                Command::none()
+            }
+            Message::WriteFile(Ok(_)) => Command::none(),
+            Message::WriteFile(Err(error)) => {
+                self.error = Some(error);
+                Command::none()
+            }
+            Message::UpdateChanges => {
+                self.party = self.save_file.get_party();
+                self.current_pc = self.save_file.pc_box(self.current_pc_index);
+                Command::none()
+            }
+            Message::SelectedPokemon((storage, pokemon)) => {
+                self.selected_pokemon_storage = storage;
+                self.selected_pokemon = pokemon;
+                Command::none()
+            }
+            Message::Increment => {
+                if !self.save_file.is_pc_empty() {
+                    if self.current_pc_index < 13 {
+                        self.current_pc_index = self.current_pc_index + 1;
+                        self.current_pc = self.save_file.pc_box(self.current_pc_index);
+                    } else {
+                        self.current_pc_index = 0;
+                        self.current_pc = self.save_file.pc_box(self.current_pc_index);
+                    }
+                }
+                Command::none()
+            }
+            Message::Decrement => {
+                if self.current_pc_index > 0 {
+                    self.current_pc_index = self.current_pc_index - 1;
+                    self.current_pc = self.save_file.pc_box(self.current_pc_index);
+                } else {
+                    self.current_pc_index = 13;
+                    self.current_pc = self.save_file.pc_box(self.current_pc_index);
+                }
+                Command::none()
+            }
+            Message::ChangePokerusStatus => {
+                match &self.selected_pokemon.pokerus_status() {
+                    Pokerus::Infected => {
+                        &self.selected_pokemon.cure_pokerus();
+                    }
+                    Pokerus::Cured => {
+                        &self.selected_pokemon.remove_pokerus();
+                    }
+                    Pokerus::None => {
+                        &self.selected_pokemon.infect_pokerus();
+                    }
+                }
+                &self.selected_pokemon.update_checksum();
+                &self
+                    .save_file
+                    .save_pokemon(self.selected_pokemon_storage, self.selected_pokemon);
+
+                self.update(Message::UpdateChanges)
+            }
+            _ => Command::none(),
+        }
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        let controls = row![
+            button("Open File").on_press(Message::OpenFile),
+            button("Save File").on_press(Message::SaveFile)
+        ];
+
+        container(
+            row![
+                column![
+                    controls,
+                    row![
+                        party(&self.selected_pokemon.ofsset(), &self.party),
+                        pc_box(
+                            &self.selected_pokemon.ofsset(),
+                            &self.current_pc_index,
+                            &self.current_pc
+                        )
+                    ]
+                    .padding([0, 0, 0, 10])
+                    .spacing(10)
+                ]
+                .spacing(20),
+                pokemon_info(&self.selected_pokemon)
+            ]
+            .spacing(10),
+        )
+        .into()
+    }
+}
+
+async fn pick_file() -> Result<PathBuf, Error> {
+    let handle = rfd::AsyncFileDialog::new()
+        .set_title("Choose a file...")
+        .add_filter("Save File", &["sav"])
+        .pick_file()
+        .await
+        .ok_or(Error::DialogClosed)?;
+
+    Ok(handle.path().to_owned())
+}
+
+async fn load_file(path: PathBuf) -> Result<Arc<Vec<u8>>, Error> {
+    let contents = tokio::fs::read(&path)
+        .await
+        .map(Arc::new)
+        .map_err(|error| error.kind())
+        .map_err(Error::IO)?;
+
+    Ok(contents)
+}
+
+async fn write_file(path: PathBuf, contents: Option<Arc<Vec<u8>>>) -> Result<(), Error> {
+    match contents {
+        Some(content) => tokio::fs::write(path, content.as_ref())
+            .await
+            .map_err(|error| error.kind())
+            .map_err(Error::IO)?,
+        None => {
+            return Err(Error::NoFileOpened);
+        }
+    }
+    Ok(())
+}
