@@ -21,11 +21,10 @@ pub enum Message {
     Increment,
     Decrement,
     ChangePokerusStatus,
-    FriendshipIncrement,
-    FriendshipDecrement,
     Loaded(Result<(), String>),
     FontLoaded(Result<(), font::Error>),
     SpeciesSelected(String),
     HeldItemSelected(String),
     FriendshipChanged(String),
+    LevelInputChanged(String),
 }

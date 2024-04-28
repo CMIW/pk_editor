@@ -15,7 +15,7 @@ use pk_editor::party::party;
 use pk_editor::pc::pc_box;
 use pk_editor::pokemon_info::pokemon_info;
 
-use pk_edit::data_structure::pokemon::{items, Pokemon, Pokerus};
+use pk_edit::data_structure::pokemon::{Pokemon, Pokerus};
 use pk_edit::{SaveFile, StorageType};
 
 fn main() -> iced::Result {
@@ -152,16 +152,6 @@ impl Application for State {
 
                 self.update(Message::UpdateChanges)
             }
-            Message::FriendshipIncrement => {
-                self.selected_pokemon
-                    .set_friendship(self.selected_pokemon.friendship().saturating_add(1));
-                self.update(Message::UpdateChanges)
-            }
-            Message::FriendshipDecrement => {
-                self.selected_pokemon
-                    .set_friendship(self.selected_pokemon.friendship().saturating_sub(1));
-                self.update(Message::UpdateChanges)
-            }
             Message::HeldItemSelected(item) => {
                 if !&self.selected_pokemon.is_empty() {
                     self.selected_pokemon.give_item(&item);
@@ -184,8 +174,26 @@ impl Application for State {
                     };
                     self.selected_pokemon.set_friendship(value);
                 }
-                println!("{value}");
                 self.update(Message::UpdateChanges)
+            }
+            Message::LevelInputChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u64>() {
+                        let lowest_level = self.selected_pokemon.lowest_level();
+                        let value = if number > 100 {
+                            100
+                        } else if number < lowest_level as u64 {
+                            lowest_level
+                        } else {
+                            number as u8
+                        };
+                        self.selected_pokemon.set_level(value);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
             }
             _ => Command::none(),
         }

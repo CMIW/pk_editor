@@ -1,6 +1,6 @@
 use iced::color;
 use iced::widget::Container;
-use iced::widget::{container, text};
+use iced::widget::{container, row, text, text_input};
 use iced::{Border, Color, Element, Shadow};
 use pk_edit::data_structure::pokemon::Gender;
 
@@ -58,6 +58,18 @@ fn level_appearance() -> iced::widget::container::Appearance {
     }
 }
 
+fn input_appearance() -> iced::widget::text_input::Appearance {
+    iced::widget::text_input::Appearance {
+        background: iced::Background::Color(Color::TRANSPARENT),
+        border: Border {
+            radius: 0.0.into(),
+            width: 0.0,
+            color: Color::TRANSPARENT,
+        },
+        icon_color: Color::TRANSPARENT,
+    }
+}
+
 pub fn gender(gender: Gender) -> Container<'static, Message> {
     let (_text, style) = match gender {
         Gender::F => ("", gender_f_apperance()),
@@ -70,6 +82,23 @@ pub fn gender(gender: Gender) -> Container<'static, Message> {
 
 pub fn level(level: u8) -> Element<'static, Message> {
     container(text(format!("Lv. {}", level)))
+        .width(80.0)
+        .height(26.0)
+        .center_x()
+        .center_y()
+        .style(level_appearance())
+        .into()
+}
+
+pub fn input_level(level: u8) -> Element<'static, Message> {
+    let input = text_input(&level.to_string(), &level.to_string())
+        .on_input(Message::LevelInputChanged)
+        .line_height(text::LineHeight::Absolute(10.into()))
+        //.style(input_appearance())
+        .width(35)
+        .size(12);
+
+    container(row![text("Lv. "), input])
         .width(80.0)
         .height(26.0)
         .center_x()

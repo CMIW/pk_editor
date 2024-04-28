@@ -1,14 +1,14 @@
 use iced::color;
-use iced::widget::{button, text_input};
+use iced::widget::text_input;
 use iced::widget::{column, container, image, mouse_area, pick_list, row, text};
 use iced::{Alignment, Border, Element, Length, Shadow};
 
 use crate::message::Message;
 use crate::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokemon_info_appearance};
-use crate::widgets::{gender, level};
+use crate::widgets::{gender, input_level};
 
-use pk_edit::data_structure::pokemon::{items, transpose_item, Pokemon, Pokerus, Stats, NATURE};
+use pk_edit::data_structure::pokemon::{items, transpose_item, Pokemon, Pokerus, Stats, NATURE, species_list};
 
 use crate::slots::move_slot;
 use iced::advanced::layout;
@@ -79,7 +79,7 @@ fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
         iced::widget::Space::with_width(Length::Fill),
         pokerus,
         iced::widget::Space::with_width(25),
-        level(pokemon.level()),
+        input_level(pokemon.level()),
         gender(pokemon.gender()),
     ]
     .align_items(Alignment::Center)
@@ -294,11 +294,7 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         text(format!("No. {}", pokemon.nat_dex_number())),
         //text(pokemon.species()),
         pick_list(
-            [
-                "Wobbuffet".to_string(),
-                "Sceptile".to_string(),
-                "Linoone".to_string()
-            ],
+            species_list(),
             Some(pokemon.species()),
             Message::SpeciesSelected
         )
@@ -323,19 +319,6 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         row![
             text("Friendship").style(iced::theme::Text::Color(color!(0xffcc00))),
             iced::widget::Space::with_width(Length::Fill),
-            /*text(pokemon.friendship()),
-            iced::widget::Space::with_width(5),
-            column![
-                button("+")
-                    .width(20)
-                    .height(12.5)
-                    .on_press(Message::FriendshipIncrement),
-                iced::widget::Space::with_height(5),
-                button("+")
-                    .width(20)
-                    .height(12.5)
-                    .on_press(Message::FriendshipDecrement),
-            ]*/
             text_input(
                 &pokemon.friendship().to_string(),
                 &pokemon.friendship().to_string()
