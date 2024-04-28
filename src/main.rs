@@ -1,9 +1,9 @@
 use iced::application::Application;
 use iced::executor;
+use iced::font;
 use iced::widget::{button, column, container, row};
-use iced::{Command, Element, Size, Theme};
-
 use iced::Settings;
+use iced::{Command, Element, Size, Theme};
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ use pk_editor::party::party;
 use pk_editor::pc::pc_box;
 use pk_editor::pokemon_info::pokemon_info;
 
-use pk_edit::data_structure::pokemon::{Pokemon, Pokerus};
+use pk_edit::data_structure::pokemon::{items, Pokemon, Pokerus};
 use pk_edit::{SaveFile, StorageType};
 
 fn main() -> iced::Result {
@@ -29,6 +29,7 @@ fn main() -> iced::Result {
     })
 }
 
+#[derive(Default, Debug)]
 pub struct State {
     error: Option<Error>,
     save_file: SaveFile,
@@ -56,7 +57,10 @@ impl Application for State {
                 selected_pokemon: Pokemon::default(),
                 selected_pokemon_storage: StorageType::None,
             },
-            Command::none(),
+            Command::batch(vec![
+                font::load(iced_aw::BOOTSTRAP_FONT_BYTES).map(Message::FontLoaded),
+                Command::perform(load(), Message::Loaded),
+            ]),
         )
     }
 
@@ -99,6 +103,13 @@ impl Application for State {
                 Command::none()
             }
             Message::UpdateChanges => {
+                if !&self.selected_pokemon.is_empty() {
+                    let _ = &self.selected_pokemon.update_checksum();
+                    let _ = &self
+                        .save_file
+                        .save_pokemon(self.selected_pokemon_storage, self.selected_pokemon);
+                }
+
                 self.party = self.save_file.get_party();
                 self.current_pc = self.save_file.pc_box(self.current_pc_index);
                 Command::none()
@@ -112,41 +123,68 @@ impl Application for State {
                 if !self.save_file.is_pc_empty() {
                     if self.current_pc_index < 13 {
                         self.current_pc_index = self.current_pc_index + 1;
-                        self.current_pc = self.save_file.pc_box(self.current_pc_index);
                     } else {
                         self.current_pc_index = 0;
-                        self.current_pc = self.save_file.pc_box(self.current_pc_index);
                     }
                 }
-                Command::none()
+                self.update(Message::UpdateChanges)
             }
             Message::Decrement => {
                 if self.current_pc_index > 0 {
                     self.current_pc_index = self.current_pc_index - 1;
-                    self.current_pc = self.save_file.pc_box(self.current_pc_index);
                 } else {
                     self.current_pc_index = 13;
-                    self.current_pc = self.save_file.pc_box(self.current_pc_index);
                 }
-                Command::none()
+                self.update(Message::UpdateChanges)
             }
             Message::ChangePokerusStatus => {
                 match &self.selected_pokemon.pokerus_status() {
                     Pokerus::Infected => {
-                        &self.selected_pokemon.cure_pokerus();
+                        let _ = &self.selected_pokemon.cure_pokerus();
                     }
                     Pokerus::Cured => {
-                        &self.selected_pokemon.remove_pokerus();
+                        let _ = &self.selected_pokemon.remove_pokerus();
                     }
                     Pokerus::None => {
-                        &self.selected_pokemon.infect_pokerus();
+                        let _ = &self.selected_pokemon.infect_pokerus();
                     }
                 }
-                &self.selected_pokemon.update_checksum();
-                &self
-                    .save_file
-                    .save_pokemon(self.selected_pokemon_storage, self.selected_pokemon);
 
+                self.update(Message::UpdateChanges)
+            }
+            Message::FriendshipIncrement => {
+                self.selected_pokemon
+                    .set_friendship(self.selected_pokemon.friendship().saturating_add(1));
+                self.update(Message::UpdateChanges)
+            }
+            Message::FriendshipDecrement => {
+                self.selected_pokemon
+                    .set_friendship(self.selected_pokemon.friendship().saturating_sub(1));
+                self.update(Message::UpdateChanges)
+            }
+            Message::HeldItemSelected(item) => {
+                if !&self.selected_pokemon.is_empty() {
+                    self.selected_pokemon.give_item(&item);
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::SpeciesSelected(species) => {
+                println!("{species}");
+                Command::none()
+            }
+            Message::FriendshipChanged(mut value) => {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u64>() {
+                    let value = if number > u8::MAX.into() {
+                        u8::MAX
+                    } else {
+                        number as u8
+                    };
+                    self.selected_pokemon.set_friendship(value);
+                }
+                println!("{value}");
                 self.update(Message::UpdateChanges)
             }
             _ => Command::none(),
@@ -181,6 +219,10 @@ impl Application for State {
         )
         .into()
     }
+}
+
+async fn load() -> Result<(), String> {
+    Ok(())
 }
 
 async fn pick_file() -> Result<PathBuf, Error> {

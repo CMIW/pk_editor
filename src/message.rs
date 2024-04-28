@@ -1,3 +1,5 @@
+use iced::font;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -19,4 +21,11 @@ pub enum Message {
     Increment,
     Decrement,
     ChangePokerusStatus,
+    FriendshipIncrement,
+    FriendshipDecrement,
+    Loaded(Result<(), String>),
+    FontLoaded(Result<(), font::Error>),
+    SpeciesSelected(String),
+    HeldItemSelected(String),
+    FriendshipChanged(String),
 }

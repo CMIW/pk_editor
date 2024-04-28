@@ -1,16 +1,13 @@
-use iced::color;
-use iced::widget::{column, container, image, mouse_area, row, text};
-use iced::widget::{Container, MouseArea};
-use iced::{Alignment, Border, Color, Element, Length, Padding, Shadow};
+use iced::widget::Container;
+use iced::widget::{column, container, image, row, text};
+use iced::Padding;
 
 use crate::message::Message;
-use crate::misc::{PROJECT_DIR, WINDOW_WIDTH};
+use crate::misc::PROJECT_DIR;
 use crate::slots::party_slot;
 use crate::theme::party_label_appearance;
-use crate::widgets::{gender, level};
 
 use pk_edit::data_structure::pokemon::Pokemon;
-use pk_edit::StorageType;
 
 fn party_label() -> Container<'static, Message> {
     let handle = image::Handle::from_memory(

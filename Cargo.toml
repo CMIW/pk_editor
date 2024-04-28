@@ -12,3 +12,4 @@ rfd = "0.14.1"
 thiserror = "1.0.59"
 include_dir = "0.7.3"
 pk_edit = { path = "/home/medaka/Projects/Rust/pk_edit"}
+iced_aw =  { version = "0.8.0", features = ["number_input","icons",] }

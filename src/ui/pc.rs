@@ -1,16 +1,13 @@
-use iced::color;
-use iced::widget::{button, column, container, image, mouse_area, row, text};
-use iced::widget::{Container, MouseArea};
-use iced::{Alignment, Border, Color, Element, Length, Padding, Shadow};
+use iced::widget::Container;
+use iced::widget::{button, column, container, image, row, text};
+use iced::{Alignment, Element};
 
 use crate::message::Message;
-use crate::misc::{PROJECT_DIR, WINDOW_WIDTH};
+use crate::misc::PROJECT_DIR;
 use crate::slots::pc_slot;
 use crate::theme::slot_appearance;
-use crate::widgets::{gender, level};
 
 use pk_edit::data_structure::pokemon::Pokemon;
-use pk_edit::StorageType;
 
 fn pc_box_label(box_number: usize) -> Element<'static, Message> {
     container(text(format!("Box {}", box_number)))

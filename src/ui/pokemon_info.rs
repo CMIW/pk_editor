@@ -1,5 +1,6 @@
 use iced::color;
-use iced::widget::{column, container, image, mouse_area, row, text};
+use iced::widget::{button, text_input};
+use iced::widget::{column, container, image, mouse_area, pick_list, row, text};
 use iced::{Alignment, Border, Element, Length, Shadow};
 
 use crate::message::Message;
@@ -7,7 +8,7 @@ use crate::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokemon_info_appearance};
 use crate::widgets::{gender, level};
 
-use pk_edit::data_structure::pokemon::{transpose_item, Pokemon, Pokerus, Stats};
+use pk_edit::data_structure::pokemon::{items, transpose_item, Pokemon, Pokerus, Stats, NATURE};
 
 use crate::slots::move_slot;
 use iced::advanced::layout;
@@ -291,12 +292,24 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
 
     let dex_species_lang = row![
         text(format!("No. {}", pokemon.nat_dex_number())),
-        text(pokemon.species()),
+        //text(pokemon.species()),
+        pick_list(
+            [
+                "Wobbuffet".to_string(),
+                "Sceptile".to_string(),
+                "Linoone".to_string()
+            ],
+            Some(pokemon.species()),
+            Message::SpeciesSelected
+        )
+        .width(130)
+        .text_line_height(text::LineHeight::Absolute(10.into())),
         iced::widget::Space::with_width(Length::Fill),
         text(pokemon.language()),
         iced::widget::Space::with_width(45),
     ]
     .spacing(20)
+    .align_items(Alignment::Center)
     .padding([5, 10, 5, 15]); // top, right, bottom, left
 
     let pid_friendship = container(row![
@@ -305,11 +318,31 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
             iced::widget::Space::with_width(30),
             text(format!("{:X}", pokemon.personality_value()))
         ]
-        .width((WINDOW_WIDTH * 0.33) / 2.0),
+        .width((WINDOW_WIDTH * 0.33) / 2.0)
+        .align_items(Alignment::Center),
         row![
             text("Friendship").style(iced::theme::Text::Color(color!(0xffcc00))),
-            iced::widget::Space::with_width(30),
-            text(pokemon.friendship()),
+            iced::widget::Space::with_width(Length::Fill),
+            /*text(pokemon.friendship()),
+            iced::widget::Space::with_width(5),
+            column![
+                button("+")
+                    .width(20)
+                    .height(12.5)
+                    .on_press(Message::FriendshipIncrement),
+                iced::widget::Space::with_height(5),
+                button("+")
+                    .width(20)
+                    .height(12.5)
+                    .on_press(Message::FriendshipDecrement),
+            ]*/
+            text_input(
+                &pokemon.friendship().to_string(),
+                &pokemon.friendship().to_string()
+            )
+            .on_input(Message::FriendshipChanged)
+            .line_height(text::LineHeight::Absolute(10.into()))
+            .size(12),
         ]
         .width((WINDOW_WIDTH * 0.33) / 2.0),
     ])
@@ -323,7 +356,14 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         row![
             text("Nature").style(iced::theme::Text::Color(color!(0xffcc00))),
             iced::widget::Space::with_width(10),
-            text(pokemon.nature())
+            //text(pokemon.nature()),
+            pick_list(
+                NATURE.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                Some(pokemon.nature()),
+                Message::SpeciesSelected
+            )
+            .width(100)
+            .text_line_height(text::LineHeight::Absolute(10.into())),
         ]
         .width((WINDOW_WIDTH * 0.33) / 2.0),
         row![
@@ -341,24 +381,35 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     .style(pokemon_info_appearance());
 
     let item_image = if let Some(item_index) = transpose_item(&pokemon.held_item()) {
-        let handle = image::Handle::from_memory(
-            PROJECT_DIR
-                .get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
-                .unwrap()
-                .contents(),
-        );
-        image(handle).height(30)
+        if let Some(item_image) =
+            PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
+        {
+            let handle = image::Handle::from_memory(item_image.contents());
+            image(handle).height(25)
+        } else {
+            image("").height(30)
+        }
     } else {
         image("").height(30)
     };
 
-    let item = container(row![
-        text("Held Item").style(iced::theme::Text::Color(color!(0xffcc00))),
-        iced::widget::Space::with_width(5),
-        item_image,
-        iced::widget::Space::with_width(5),
-        text(pokemon.held_item())
-    ])
+    let item = container(
+        row![
+            text("Held Item").style(iced::theme::Text::Color(color!(0xffcc00))),
+            iced::widget::Space::with_width(5),
+            item_image,
+            iced::widget::Space::with_width(5),
+            pick_list(
+                items(),
+                Some(pokemon.held_item()),
+                Message::HeldItemSelected
+            )
+            .width(150)
+            .text_line_height(text::LineHeight::Absolute(10.into())),
+            iced::widget::Space::with_width(Length::Fill),
+        ]
+        .align_items(Alignment::Center),
+    )
     .width(WINDOW_WIDTH * 0.33)
     .height(40.0)
     .align_y(iced::alignment::Vertical::Center)
