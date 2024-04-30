@@ -27,4 +27,11 @@ pub enum Message {
     HeldItemSelected(String),
     FriendshipChanged(String),
     LevelInputChanged(String),
+    NatureSelected(String),
+    HPEVChanged(String),
+    AttackEVChanged(String),
+    DefenseEVChanged(String),
+    SpAtkEVChanged(String),
+    SpDefEVChanged(String),
+    SpeedEVChanged(String),
 }

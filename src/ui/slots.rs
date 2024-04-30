@@ -1,4 +1,4 @@
-use iced::widget::{column, container, image, mouse_area, row, text};
+use iced::widget::{column, container, image, mouse_area, pick_list, row, text};
 use iced::widget::{Container, MouseArea};
 use iced::{Alignment, Element, Length, Padding};
 
@@ -7,6 +7,7 @@ use crate::misc::{PROJECT_DIR, WINDOW_WIDTH};
 use crate::theme::{slot_appearance, slot_selected_appearance};
 use crate::widgets::{gender, level};
 
+use pk_edit::data_structure::pokemon::moves;
 use pk_edit::data_structure::pokemon::Pokemon;
 use pk_edit::StorageType;
 
@@ -28,7 +29,14 @@ pub fn move_slot(
     container(
         row![
             move_icon,
-            text(move_name),
+            //text(move_name),
+            pick_list(
+                moves(),
+                Some(move_name.to_string()),
+                Message::NatureSelected
+            )
+            .width(140)
+            .text_line_height(text::LineHeight::Absolute(10.into())),
             iced::widget::Space::with_width(Length::Fill),
             pp(pp_used, pp_total),
             iced::widget::Space::with_width(100)
@@ -54,7 +62,7 @@ fn pp(pp_used: u8, pp_total: u8) -> Container<'static, Message> {
 }
 
 pub fn pc_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
-    let apperance = if id == &pokemon.ofsset() && !pokemon.is_empty() {
+    let apperance = if id == &pokemon.ofsset() {
         slot_selected_appearance()
     } else {
         slot_appearance()
@@ -86,7 +94,7 @@ pub fn pc_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
                 .align_y(iced::alignment::Vertical::Bottom);
 
             mouse_area(container)
-                .on_press(Message::SelectedPokemon((StorageType::PC, pokemon.clone())))
+                .on_press(Message::SelectedPokemon((StorageType::PC, *pokemon)))
         }
         true => {
             let container = container("")
@@ -97,13 +105,13 @@ pub fn pc_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
                 .align_y(iced::alignment::Vertical::Bottom);
 
             mouse_area(container)
-                .on_press(Message::SelectedPokemon((StorageType::PC, pokemon.clone())))
+                .on_press(Message::SelectedPokemon((StorageType::PC, *pokemon)))
         }
     }
 }
 
 pub fn party_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
-    let apperance = if id == &pokemon.ofsset() && !pokemon.is_empty() {
+    let apperance = if id == &pokemon.ofsset() {
         slot_selected_appearance()
     } else {
         slot_appearance()
@@ -149,7 +157,7 @@ pub fn party_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> 
 
             mouse_area(container).on_press(Message::SelectedPokemon((
                 StorageType::Party,
-                pokemon.clone(),
+                *pokemon,
             )))
         }
         true => {
@@ -161,7 +169,7 @@ pub fn party_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> 
 
             mouse_area(container).on_press(Message::SelectedPokemon((
                 StorageType::Party,
-                pokemon.clone(),
+                *pokemon,
             )))
         }
     }

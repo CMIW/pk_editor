@@ -8,7 +8,9 @@ use crate::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokemon_info_appearance};
 use crate::widgets::{gender, input_level};
 
-use pk_edit::data_structure::pokemon::{items, transpose_item, Pokemon, Pokerus, Stats, NATURE, species_list};
+use pk_edit::data_structure::pokemon::{
+    items, species_list, transpose_item, Pokemon, Pokerus, Stats, NATURE,
+};
 
 use crate::slots::move_slot;
 use iced::advanced::layout;
@@ -97,7 +99,7 @@ fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
 
 fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
     let (_, highest_stat) = stats.highest_stat(level);
-    let scale = if highest_stat >= 400 { 0.25 } else { 0.45 };
+    let scale = if highest_stat >= 400 { 0.23 } else { 0.45 };
     let hp = stats.hp(level);
     let attack = stats.attack(level);
     let defense = stats.defense(level);
@@ -124,10 +126,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             stat_bar(hp as f32 * scale),
             text(hp),
             iced::widget::Space::with_width(Length::Fill),
-            text(stats.hp_ev())
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
-            text(stats.hp_iv())
+            text_input(&stats.hp_ev.to_string(), &stats.hp_ev.to_string())
+                .on_input(Message::HPEVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(35)
+                .size(12),
+            text(stats.hp_iv)
                 .width(ev_iv_width)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
         ]
@@ -138,10 +142,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             stat_bar(attack as f32 * scale),
             text(attack),
             iced::widget::Space::with_width(Length::Fill),
-            text(stats.attack_ev())
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
-            text(stats.attack_iv())
+            text_input(&stats.attack_ev.to_string(), &stats.attack_ev.to_string())
+                .on_input(Message::AttackEVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(35)
+                .size(12),
+            text(stats.attack_iv)
                 .width(ev_iv_width)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
         ]
@@ -152,10 +158,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             stat_bar(defense as f32 * scale),
             text(defense),
             iced::widget::Space::with_width(Length::Fill),
-            text(stats.defense_ev())
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
-            text(stats.defense_iv())
+            text_input(&stats.defense_ev.to_string(), &stats.defense_ev.to_string())
+                .on_input(Message::DefenseEVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(35)
+                .size(12),
+            text(stats.defense_iv)
                 .width(ev_iv_width)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
         ]
@@ -166,10 +174,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             stat_bar(sp_attack as f32 * scale),
             text(sp_attack),
             iced::widget::Space::with_width(Length::Fill),
-            text(stats.sp_attack_ev())
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
-            text(stats.sp_attack_iv())
+            text_input(&stats.sp_attack_ev.to_string(), &stats.sp_attack_ev.to_string())
+                .on_input(Message::SpAtkEVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(35)
+                .size(12),
+            text(stats.sp_attack_iv)
                 .width(ev_iv_width)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
         ]
@@ -180,10 +190,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             stat_bar(sp_defense as f32 * scale),
             text(sp_defense),
             iced::widget::Space::with_width(Length::Fill),
-            text(stats.sp_defense_ev())
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
-            text(stats.sp_defense_iv())
+            text_input(&stats.sp_defense_ev.to_string(), &stats.sp_defense_ev.to_string())
+                .on_input(Message::SpDefEVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(35)
+                .size(12),
+            text(stats.sp_defense_iv)
                 .width(ev_iv_width)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
         ]
@@ -194,10 +206,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             stat_bar(speed as f32 * scale),
             text(speed),
             iced::widget::Space::with_width(Length::Fill),
-            text(stats.speed_ev())
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
-            text(stats.speed_iv())
+            text_input(&stats.speed_ev.to_string(), &stats.speed_ev.to_string())
+                .on_input(Message::SpeedEVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(35)
+                .size(12),
+            text(stats.speed_iv)
                 .width(ev_iv_width)
                 .horizontal_alignment(iced::alignment::Horizontal::Center),
         ]
@@ -343,7 +357,7 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
             pick_list(
                 NATURE.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
                 Some(pokemon.nature()),
-                Message::SpeciesSelected
+                Message::NatureSelected
             )
             .width(100)
             .text_line_height(text::LineHeight::Absolute(10.into())),

@@ -77,20 +77,19 @@ pub fn gender(gender: Gender) -> Container<'static, Message> {
         Gender::None => ("", gender_n_apperance()),
     };
 
-    container("").width(26.0).height(26.0).style(style).into()
+    container("").width(26.0).height(26.0).style(style)
 }
 
-pub fn level(level: u8) -> Element<'static, Message> {
+pub fn level(level: u8) -> Container<'static, Message> {
     container(text(format!("Lv. {}", level)))
         .width(80.0)
         .height(26.0)
         .center_x()
         .center_y()
         .style(level_appearance())
-        .into()
 }
 
-pub fn input_level(level: u8) -> Element<'static, Message> {
+pub fn input_level(level: u8) -> Container<'static, Message> {
     let input = text_input(&level.to_string(), &level.to_string())
         .on_input(Message::LevelInputChanged)
         .line_height(text::LineHeight::Absolute(10.into()))
@@ -104,5 +103,4 @@ pub fn input_level(level: u8) -> Element<'static, Message> {
         .center_x()
         .center_y()
         .style(level_appearance())
-        .into()
 }

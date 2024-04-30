@@ -19,7 +19,7 @@ fn pc_box_label(box_number: usize) -> Element<'static, Message> {
         .into()
 }
 
-pub fn pc_box(id: &usize, num: &usize, pc_box: &Vec<Pokemon>) -> Container<'static, Message> {
+pub fn pc_box(id: &usize, num: &usize, pc_box: &[Pokemon]) -> Container<'static, Message> {
     let label = pc_box_label(num + 1);
     let mut col = iced::widget::Column::new()
         .align_items(Alignment::Center)

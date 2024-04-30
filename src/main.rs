@@ -122,7 +122,7 @@ impl Application for State {
             Message::Increment => {
                 if !self.save_file.is_pc_empty() {
                     if self.current_pc_index < 13 {
-                        self.current_pc_index = self.current_pc_index + 1;
+                        self.current_pc_index += 1;
                     } else {
                         self.current_pc_index = 0;
                     }
@@ -131,7 +131,7 @@ impl Application for State {
             }
             Message::Decrement => {
                 if self.current_pc_index > 0 {
-                    self.current_pc_index = self.current_pc_index - 1;
+                    self.current_pc_index -= 1;
                 } else {
                     self.current_pc_index = 13;
                 }
@@ -189,6 +189,110 @@ impl Application for State {
                             number as u8
                         };
                         self.selected_pokemon.set_level(value);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::NatureSelected(nature) => Command::none(),
+            Message::HPEVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("HP", number);
+                    } else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("HP", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::AttackEVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Attack", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Attack", 0);
+                    }
+
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::DefenseEVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Defense", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Defense", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::SpAtkEVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Sp. Atk", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Sp. Atk", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::SpDefEVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Sp. Def", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Sp. Def", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::SpeedEVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Speed", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_evs("Speed", 0);
                     }
                     self.update(Message::UpdateChanges)
                 } else {
