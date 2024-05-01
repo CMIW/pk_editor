@@ -15,7 +15,7 @@ use pk_editor::party::party;
 use pk_editor::pc::pc_box;
 use pk_editor::pokemon_info::pokemon_info;
 
-use pk_edit::data_structure::pokemon::{Pokemon, Pokerus};
+use pk_edit::data_structure::pokemon::{Pokemon, Pokerus, gen_pokemon_from_species};
 use pk_edit::{SaveFile, StorageType};
 
 fn main() -> iced::Result {
@@ -126,16 +126,22 @@ impl Application for State {
                     } else {
                         self.current_pc_index = 0;
                     }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
                 }
-                self.update(Message::UpdateChanges)
             }
             Message::Decrement => {
-                if self.current_pc_index > 0 {
-                    self.current_pc_index -= 1;
+                if !self.save_file.is_pc_empty() {
+                    if self.current_pc_index > 0 {
+                        self.current_pc_index -= 1;
+                    } else {
+                        self.current_pc_index = 13;
+                    }
+                    self.update(Message::UpdateChanges)
                 } else {
-                    self.current_pc_index = 13;
+                    Command::none()
                 }
-                self.update(Message::UpdateChanges)
             }
             Message::ChangePokerusStatus => {
                 match &self.selected_pokemon.pokerus_status() {
@@ -161,8 +167,19 @@ impl Application for State {
                 }
             }
             Message::SpeciesSelected(species) => {
-                println!("{species}");
-                Command::none()
+                if self.selected_pokemon.is_empty() && !self.save_file.is_empty() {
+                    self.selected_pokemon = gen_pokemon_from_species(&mut self.selected_pokemon, &species, &self.save_file.ot_name(), &self.save_file.ot_id());
+
+                    println!("{:?}", self.selected_pokemon.nat_dex_number());
+                    println!("{:?}", self.selected_pokemon.nickname());
+                    println!("{:?}", self.selected_pokemon.level());
+                    println!("{:?}", self.selected_pokemon.is_egg());
+                    println!("{:?}", self.selected_pokemon.is_bad_egg());
+
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
             }
             Message::FriendshipChanged(mut value) => {
                 value.retain(|c| c.is_numeric());
@@ -293,6 +310,109 @@ impl Application for State {
                         self.selected_pokemon
                             .stats_mut()
                             .update_evs("Speed", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::HPIVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("HP", number);
+                    } else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("HP", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::AttackIVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Attack", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Attack", 0);
+                    }
+
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::DefenseIVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Defense", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Defense", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::SpAtkIVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Sp. Atk", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Sp. Atk", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::SpDefIVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Sp. Def", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Sp. Def", 0);
+                    }
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
+                }
+            }
+            Message::SpeedIVChanged(mut value) => {
+                if !self.selected_pokemon.is_empty() {
+                    value.retain(|c| c.is_numeric());
+                    if let Ok(number) = value.parse::<u16>(){
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Speed", number);
+                    }else if value.is_empty() {
+                        self.selected_pokemon
+                            .stats_mut()
+                            .update_ivs("Speed", 0);
                     }
                     self.update(Message::UpdateChanges)
                 } else {

@@ -34,4 +34,10 @@ pub enum Message {
     SpAtkEVChanged(String),
     SpDefEVChanged(String),
     SpeedEVChanged(String),
+    HPIVChanged(String),
+    AttackIVChanged(String),
+    DefenseIVChanged(String),
+    SpAtkIVChanged(String),
+    SpDefIVChanged(String),
+    SpeedIVChanged(String),
 }

@@ -131,9 +131,11 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text(stats.hp_iv)
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
+            text_input(&stats.hp_iv.to_string(), &stats.hp_iv.to_string())
+                .on_input(Message::HPIVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(30)
+                .size(12),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
@@ -147,9 +149,11 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text(stats.attack_iv)
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
+            text_input(&stats.attack_iv.to_string(), &stats.attack_iv.to_string())
+                .on_input(Message::AttackIVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(30)
+                .size(12),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
@@ -163,9 +167,11 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text(stats.defense_iv)
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
+            text_input(&stats.defense_iv.to_string(), &stats.defense_iv.to_string())
+                .on_input(Message::DefenseIVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(30)
+                .size(12),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
@@ -179,9 +185,11 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text(stats.sp_attack_iv)
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
+            text_input(&stats.sp_attack_iv.to_string(), &stats.sp_attack_iv.to_string())
+                .on_input(Message::SpAtkIVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(30)
+                .size(12),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
@@ -195,9 +203,11 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text(stats.sp_defense_iv)
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
+            text_input(&stats.sp_defense_iv.to_string(), &stats.sp_defense_iv.to_string())
+                .on_input(Message::SpDefIVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(30)
+                .size(12),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
@@ -211,9 +221,11 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text(stats.speed_iv)
-                .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
+            text_input(&stats.speed_iv.to_string(), &stats.speed_iv.to_string())
+                .on_input(Message::SpeedIVChanged)
+                .line_height(text::LineHeight::Absolute(10.into()))
+                .width(30)
+                .size(12),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
@@ -322,6 +334,27 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     .align_items(Alignment::Center)
     .padding([5, 10, 5, 15]); // top, right, bottom, left
 
+    let ot = container(row![
+        row![
+            text("OT Name").style(iced::theme::Text::Color(color!(0xffcc00))),
+            iced::widget::Space::with_width(10),
+            text(pokemon.ot_name()),
+        ]
+        .width((WINDOW_WIDTH * 0.33) / 2.0),
+        /*row![
+            text("Ability").style(iced::theme::Text::Color(color!(0xffcc00))),
+            iced::widget::Space::with_width(15),
+            text(pokemon.ability()),
+        ]
+        .width((WINDOW_WIDTH * 0.33) / 2.0),*/
+    ])
+    .width(WINDOW_WIDTH * 0.33)
+    .height(40.0)
+    .align_y(iced::alignment::Vertical::Center)
+    .align_x(iced::alignment::Horizontal::Left)
+    .padding([5, 15])
+    .style(pokemon_info_appearance());
+
     let pid_friendship = container(row![
         row![
             text("PID").style(iced::theme::Text::Color(color!(0xffcc00))),
@@ -421,11 +454,12 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         pokemon_info_typing(pokemon.typing()),
         stats(pokemon.stats(), pokemon.level()),
         iced::widget::Space::with_height(Length::Fill),
+        ot,
         pid_friendship,
         nature_ability,
         item,
         moves,
-        row![].height(40)
+        row![].height(30)
     ])
     .width(WINDOW_WIDTH * 0.33)
     .height(WINDOW_HEIGHT)

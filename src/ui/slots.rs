@@ -62,7 +62,7 @@ fn pp(pp_used: u8, pp_total: u8) -> Container<'static, Message> {
 }
 
 pub fn pc_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
-    let apperance = if id == &pokemon.ofsset() {
+    let apperance = if id == &pokemon.ofsset() && !pokemon.is_empty(){
         slot_selected_appearance()
     } else {
         slot_appearance()
@@ -111,7 +111,7 @@ pub fn pc_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
 }
 
 pub fn party_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
-    let apperance = if id == &pokemon.ofsset() {
+    let apperance = if id == &pokemon.ofsset() && !pokemon.is_empty() {
         slot_selected_appearance()
     } else {
         slot_appearance()
