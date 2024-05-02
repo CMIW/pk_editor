@@ -170,15 +170,10 @@ impl Application for State {
                 if self.selected_pokemon.is_empty() && !self.save_file.is_empty() {
                     self.selected_pokemon = gen_pokemon_from_species(&mut self.selected_pokemon, &species, &self.save_file.ot_name(), &self.save_file.ot_id());
 
-                    println!("{:?}", self.selected_pokemon.nat_dex_number());
-                    println!("{:?}", self.selected_pokemon.nickname());
-                    println!("{:?}", self.selected_pokemon.level());
-                    println!("{:?}", self.selected_pokemon.is_egg());
-                    println!("{:?}", self.selected_pokemon.is_bad_egg());
-
                     self.update(Message::UpdateChanges)
                 } else {
-                    Command::none()
+                    self.selected_pokemon.set_species(&species);
+                    self.update(Message::UpdateChanges)
                 }
             }
             Message::FriendshipChanged(mut value) => {
@@ -434,9 +429,9 @@ impl Application for State {
                 column![
                     controls,
                     row![
-                        party(&self.selected_pokemon.ofsset(), &self.party),
+                        party(&self.selected_pokemon.offset(), &self.party),
                         pc_box(
-                            &self.selected_pokemon.ofsset(),
+                            &self.selected_pokemon.offset(),
                             &self.current_pc_index,
                             &self.current_pc
                         )
