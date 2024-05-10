@@ -1,21 +1,28 @@
 use iced::application::Application;
 use iced::executor;
 use iced::font;
-use iced::widget::{button, column, container, row};
+use iced::widget::image;
+use iced::widget::Column;
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
 use iced::Settings;
-use iced::{Command, Element, Size, Theme};
+use iced::{Alignment, Command, Element, Size, Theme};
+
+use iced::widget::scrollable::Properties;
+use iced::widget::scrollable::Direction;
+use iced::widget::Scrollable;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use pk_editor::error::Error;
 use pk_editor::message::Message;
-use pk_editor::misc::{WINDOW_HEIGHT, WINDOW_WIDTH};
+use pk_editor::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
 use pk_editor::party::party;
 use pk_editor::pc::pc_box;
 use pk_editor::pokemon_info::pokemon_info;
 
-use pk_edit::data_structure::pokemon::{Pokemon, Pokerus, gen_pokemon_from_species};
+use pk_edit::data_structure::pokemon::{gen_pokemon_from_species, Pokemon, Pokerus};
+use pk_edit::misc::{key_list, tm_list, berries_list, balls_list, items_list, transpose_item};
 use pk_edit::{SaveFile, StorageType};
 
 fn main() -> iced::Result {
@@ -38,6 +45,13 @@ pub struct State {
     current_pc_index: usize,
     selected_pokemon: Pokemon,
     selected_pokemon_storage: StorageType,
+    item_bag: Vec<(String, u16)>,
+    ball_bag: Vec<(String, u16)>,
+    berry_bag: Vec<(String, u16)>,
+    tm_bag: Vec<(String, u16)>,
+    key_bag: Vec<(String, u16)>,
+    pokemon_view: bool,
+    bag_view: bool,
 }
 
 impl Application for State {
@@ -56,6 +70,13 @@ impl Application for State {
                 current_pc_index: 0,
                 selected_pokemon: Pokemon::default(),
                 selected_pokemon_storage: StorageType::None,
+                item_bag: vec![],
+                ball_bag: vec![],
+                berry_bag: vec![],
+                tm_bag: vec![],
+                key_bag: vec![],
+                pokemon_view: true,
+                bag_view: false,
             },
             Command::batch(vec![
                 font::load(iced_aw::BOOTSTRAP_FONT_BYTES).map(Message::FontLoaded),
@@ -90,6 +111,11 @@ impl Application for State {
                 self.current_pc_index = 0;
                 self.selected_pokemon = Pokemon::default();
                 self.selected_pokemon_storage = StorageType::None;
+                self.item_bag = vec![];
+                self.ball_bag = vec![];
+                self.berry_bag = vec![];
+                self.tm_bag = vec![];
+                self.key_bag = vec![];
 
                 self.update(Message::UpdateChanges)
             }
@@ -112,6 +138,12 @@ impl Application for State {
 
                 self.party = self.save_file.get_party();
                 self.current_pc = self.save_file.pc_box(self.current_pc_index);
+                self.item_bag = self.save_file.item_pocket();
+                self.ball_bag = self.save_file.ball_pocket();
+                self.berry_bag = self.save_file.berry_pocket();
+                self.tm_bag = self.save_file.tm_pocket();
+                self.key_bag = self.save_file.key_pocket();
+
                 Command::none()
             }
             Message::SelectedPokemon((storage, pokemon)) => {
@@ -168,12 +200,29 @@ impl Application for State {
             }
             Message::SpeciesSelected(species) => {
                 if self.selected_pokemon.is_empty() && !self.save_file.is_empty() {
-                    self.selected_pokemon = gen_pokemon_from_species(&mut self.selected_pokemon, &species, &self.save_file.ot_name(), &self.save_file.ot_id());
+                    self.selected_pokemon = gen_pokemon_from_species(
+                        &mut self.selected_pokemon,
+                        &species,
+                        &self.save_file.ot_name(),
+                        &self.save_file.ot_id(),
+                    );
 
                     self.update(Message::UpdateChanges)
                 } else {
                     self.selected_pokemon.set_species(&species);
                     self.update(Message::UpdateChanges)
+                }
+            }
+            Message::MoveSelected(index, value) => {
+                self.selected_pokemon.set_move(index, &value);
+                self.update(Message::UpdateChanges)
+            }
+            Message::AddMove(index) => {
+                if !self.selected_pokemon.is_empty() {
+                    self.selected_pokemon.set_move(index, "Pound");
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Command::none()
                 }
             }
             Message::FriendshipChanged(mut value) => {
@@ -207,212 +256,161 @@ impl Application for State {
                     Command::none()
                 }
             }
-            Message::NatureSelected(nature) => Command::none(),
-            Message::HPEVChanged(mut value) => {
+            Message::NatureSelected(nature) => {
+                //self.selected_pokemon.set_nature(&nature);
+                self.update(Message::UpdateChanges)
+            }
+            Message::IVChanged(iv, mut value) => {
                 if !self.selected_pokemon.is_empty() {
                     value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("HP", number);
+                    if let Ok(number) = value.parse::<u16>() {
+                        self.selected_pokemon.stats_mut().update_ivs(&iv, number);
                     } else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("HP", 0);
+                        self.selected_pokemon.stats_mut().update_ivs(&iv, 0);
                     }
                     self.update(Message::UpdateChanges)
                 } else {
                     Command::none()
                 }
             }
-            Message::AttackEVChanged(mut value) => {
+            Message::EVChanged(ev, mut value) => {
                 if !self.selected_pokemon.is_empty() {
                     value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Attack", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Attack", 0);
-                    }
-
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Command::none()
-                }
-            }
-            Message::DefenseEVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Defense", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Defense", 0);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Command::none()
-                }
-            }
-            Message::SpAtkEVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Sp. Atk", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Sp. Atk", 0);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Command::none()
-                }
-            }
-            Message::SpDefEVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Sp. Def", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Sp. Def", 0);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Command::none()
-                }
-            }
-            Message::SpeedEVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Speed", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_evs("Speed", 0);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Command::none()
-                }
-            }
-            Message::HPIVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("HP", number);
+                    if let Ok(number) = value.parse::<u16>() {
+                        self.selected_pokemon.stats_mut().update_evs(&ev, number);
                     } else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("HP", 0);
+                        self.selected_pokemon.stats_mut().update_evs(&ev, 0);
                     }
                     self.update(Message::UpdateChanges)
                 } else {
                     Command::none()
                 }
             }
-            Message::AttackIVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Attack", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Attack", 0);
+            Message::PokemonView => {
+                self.pokemon_view = true;
+                self.bag_view = false;
+                Command::none()
+            }
+            Message::BagView => {
+                self.pokemon_view = false;
+                self.bag_view = true;
+                Command::none()
+            }
+            Message::ItemChanged(i, selected) => {
+                self.item_bag[i].0 = selected;
+                if self.item_bag[i].1 == 0 {
+                    self.item_bag[i].1 = 1;
+                }
+                self.save_file.save_item_pocket(self.item_bag.clone());
+                self.update(Message::UpdateChanges)
+            }
+            Message::ItemQuantityChanged(i, mut value) => {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u16>() {
+                    if number >= 99 {
+                        self.item_bag[i].1 = 99;
+                    } else if number == 0 {
+                        self.item_bag[i].1 = 0;
+                        self.item_bag[i].0 = "Nothing".to_string();
+                    } else {
+                        self.item_bag[i].1 = number;
                     }
-
+                    self.save_file.save_item_pocket(self.item_bag.clone());
                     self.update(Message::UpdateChanges)
                 } else {
                     Command::none()
                 }
             }
-            Message::DefenseIVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Defense", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Defense", 0);
+            Message::BallChanged(i, selected) => {
+                self.ball_bag[i].0 = selected;
+                if self.ball_bag[i].0 == "Nothing" {
+                    self.ball_bag[i].1 = 0;
+                } else if self.ball_bag[i].1 == 0 {
+                    self.ball_bag[i].1 = 1;
+                }
+                self.save_file.save_ball_pocket(self.ball_bag.clone());
+                self.update(Message::UpdateChanges)
+            }
+            Message::BallQuantityChanged(i, mut value) => {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u16>() {
+                    if number >= 99 {
+                        self.ball_bag[i].1 = 99;
+                    } else if number == 0 {
+                        self.ball_bag[i].1 = 0;
+                        self.ball_bag[i].0 = "Nothing".to_string();
+                    } else {
+                        self.ball_bag[i].1 = number;
                     }
+                    self.save_file.save_ball_pocket(self.ball_bag.clone());
                     self.update(Message::UpdateChanges)
                 } else {
                     Command::none()
                 }
             }
-            Message::SpAtkIVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Sp. Atk", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Sp. Atk", 0);
+            Message::BerryChanged(i, selected) => {
+                self.berry_bag[i].0 = selected;
+                if self.berry_bag[i].0 == "Nothing" {
+                    self.berry_bag[i].1 = 0;
+                } else if self.berry_bag[i].1 == 0 {
+                    self.berry_bag[i].1 = 1;
+                }
+                self.save_file.save_berry_pocket(self.berry_bag.clone());
+                self.update(Message::UpdateChanges)
+            }
+            Message::BerryQuantityChanged(i, mut value) => {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u16>() {
+                    if number >= 99 {
+                        self.berry_bag[i].1 = 99;
+                    } else if number == 0 {
+                        self.berry_bag[i].1 = 0;
+                        self.berry_bag[i].0 = "Nothing".to_string();
+                    } else {
+                        self.berry_bag[i].1 = number;
                     }
+                    self.save_file.save_berry_pocket(self.berry_bag.clone());
                     self.update(Message::UpdateChanges)
                 } else {
                     Command::none()
                 }
             }
-            Message::SpDefIVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Sp. Def", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Sp. Def", 0);
+            Message::TmChanged(i, selected) => {
+                self.tm_bag[i].0 = selected;
+                if self.tm_bag[i].0 == "Nothing" {
+                    self.tm_bag[i].1 = 0;
+                } else if self.tm_bag[i].1 == 0 {
+                    self.tm_bag[i].1 = 1;
+                }
+                self.save_file.save_tm_pocket(self.tm_bag.clone());
+                self.update(Message::UpdateChanges)
+            }
+            Message::TmQuantityChanged(i, mut value) => {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u16>() {
+                    if number >= 99 {
+                        self.tm_bag[i].1 = 99;
+                    } else if number == 0 {
+                        self.tm_bag[i].1 = 0;
+                        self.tm_bag[i].0 = "Nothing".to_string();
+                    } else {
+                        self.tm_bag[i].1 = number;
                     }
+                    self.save_file.save_tm_pocket(self.tm_bag.clone());
                     self.update(Message::UpdateChanges)
                 } else {
                     Command::none()
                 }
             }
-            Message::SpeedIVChanged(mut value) => {
-                if !self.selected_pokemon.is_empty() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>(){
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Speed", number);
-                    }else if value.is_empty() {
-                        self.selected_pokemon
-                            .stats_mut()
-                            .update_ivs("Speed", 0);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Command::none()
+            Message::KeyChanged(i, selected) => {
+                self.key_bag[i].0 = selected;
+                if self.key_bag[i].0 == "Nothing" {
+                    self.key_bag[i].1 = 0;
+                } else if self.key_bag[i].1 == 0 {
+                    self.key_bag[i].1 = 1;
                 }
+                self.save_file.save_key_pocket(self.key_bag.clone());
+                self.update(Message::UpdateChanges)
             }
             _ => Command::none(),
         }
@@ -421,31 +419,254 @@ impl Application for State {
     fn view(&self) -> Element<'_, Message> {
         let controls = row![
             button("Open File").on_press(Message::OpenFile),
-            button("Save File").on_press(Message::SaveFile)
+            button("Save File").on_press(Message::SaveFile),
+            button("Pokemon").on_press(Message::PokemonView),
+            button("Bag").on_press(Message::BagView),
         ];
 
-        container(
-            row![
-                column![
-                    controls,
-                    row![
-                        party(&self.selected_pokemon.offset(), &self.party),
-                        pc_box(
-                            &self.selected_pokemon.offset(),
-                            &self.current_pc_index,
-                            &self.current_pc
-                        )
-                    ]
-                    .padding([0, 0, 0, 10])
-                    .spacing(10)
+        let pokemon_view = row![
+            column![
+                controls,
+                row![
+                    party(&self.selected_pokemon.offset(), &self.party),
+                    pc_box(
+                        &self.selected_pokemon.offset(),
+                        &self.current_pc_index,
+                        &self.current_pc
+                    )
                 ]
-                .spacing(20),
-                pokemon_info(&self.selected_pokemon)
+                .padding([0, 0, 0, 10])
+                .spacing(10)
             ]
-            .spacing(10),
-        )
-        .into()
+            .spacing(20),
+            pokemon_info(&self.selected_pokemon)
+        ]
+        .spacing(10);
+
+        let controls = row![
+            button("Open File").on_press(Message::OpenFile),
+            button("Save File").on_press(Message::SaveFile),
+            button("Pokemon").on_press(Message::PokemonView),
+            button("Bag").on_press(Message::BagView),
+        ];
+
+        let bag_view = row![column![
+            controls,
+            if !self.save_file.is_empty() {
+                row![
+                    Scrollable::new(row![
+                    items_bag(self.item_bag.clone()),
+                    balls_bag(self.ball_bag.clone()),
+                    tms_bag(self.tm_bag.clone()),
+                    berries_bag(self.berry_bag.clone()),
+                    keys_bag(self.key_bag.clone()),
+                ]).direction(Direction::Horizontal(Properties::new()))
+                ]
+            } else {
+                row![]
+            }
+        ]
+        .spacing(20),]
+        .spacing(10);
+
+        let view = if self.pokemon_view {
+            pokemon_view
+        } else {
+            bag_view
+        };
+
+        container(view).into()
     }
+}
+
+fn items_bag(bag: Vec<(String, u16)>) -> Column<'static, Message> {
+    let mut column = column![];
+    for (i, (item, quantity)) in bag.into_iter().enumerate() {
+        let item_image = if let Some(item_index) = transpose_item(&item) {
+            if let Some(item_image) =
+                PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
+            {
+                let handle = image::Handle::from_memory(item_image.contents());
+                image(handle).height(40)
+            } else {
+                image("").width(40)
+            }
+        } else {
+            image("").width(40)
+        };
+
+        column = column.push(
+            row![
+                item_image,
+                pick_list(items_list(), Some(item), move |selected| {
+                    Message::ItemChanged(i, selected)
+                })
+                .width(150)
+                .text_line_height(text::LineHeight::Absolute(10.into())),
+                text_input(&quantity.to_string(), &quantity.to_string())
+                    .on_input(move |input| Message::ItemQuantityChanged(i, input))
+                    .line_height(text::LineHeight::Absolute(10.into()))
+                    .width(30)
+                    .size(12),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .width(250)
+            .height(40.0),
+        )
+    }
+    column![text("Items"), scrollable(column)].align_items(Alignment::Center)
+}
+
+fn balls_bag(bag: Vec<(String, u16)>) -> Column<'static, Message> {
+    let mut column = column![];
+    for (i, (item, quantity)) in bag.into_iter().enumerate() {
+        let item_image = if let Some(item_index) = transpose_item(&item) {
+            if let Some(item_image) =
+                PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
+            {
+                let handle = image::Handle::from_memory(item_image.contents());
+                image(handle).height(40)
+            } else {
+                image("").width(40)
+            }
+        } else {
+            image("").width(40)
+        };
+
+        column = column.push(
+            row![
+                item_image,
+                pick_list(balls_list(), Some(item), move |selected| {
+                    Message::BallChanged(i, selected)
+                })
+                .width(150)
+                .text_line_height(text::LineHeight::Absolute(10.into())),
+                text_input(&quantity.to_string(), &quantity.to_string())
+                    .on_input(move |input| Message::BallQuantityChanged(i, input))
+                    .line_height(text::LineHeight::Absolute(10.into()))
+                    .width(30)
+                    .size(12),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .width(250)
+            .height(40.0),
+        )
+    }
+    column![text("Pokeballs"), scrollable(column)].align_items(Alignment::Center)
+}
+
+fn berries_bag(bag: Vec<(String, u16)>) -> Column<'static, Message> {
+    let mut column = column![];
+    for (i, (item, quantity)) in bag.into_iter().enumerate() {
+        let item_image = if let Some(item_index) = transpose_item(&item) {
+            if let Some(item_image) =
+                PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
+            {
+                let handle = image::Handle::from_memory(item_image.contents());
+                image(handle).height(40)
+            } else {
+                image("").width(40)
+            }
+        } else {
+            image("").width(40)
+        };
+
+        column = column.push(
+            row![
+                item_image,
+                pick_list(berries_list(), Some(item), move |selected| {
+                    Message::BerryChanged(i, selected)
+                })
+                .width(150)
+                .text_line_height(text::LineHeight::Absolute(10.into())),
+                text_input(&quantity.to_string(), &quantity.to_string())
+                    .on_input(move |input| Message::BerryQuantityChanged(i, input))
+                    .line_height(text::LineHeight::Absolute(10.into()))
+                    .width(30)
+                    .size(12),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .width(250)
+            .height(40.0),
+        )
+    }
+    column![text("Berries"), scrollable(column)].align_items(Alignment::Center)
+}
+
+fn tms_bag(bag: Vec<(String, u16)>) -> Column<'static, Message> {
+    let mut column = column![];
+    for (i, (item, quantity)) in bag.into_iter().enumerate() {
+        let item_image = if let Some(item_index) = transpose_item(&item) {
+            if let Some(item_image) =
+                PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
+            {
+                let handle = image::Handle::from_memory(item_image.contents());
+                image(handle).height(40)
+            } else {
+                image("").width(40)
+            }
+        } else {
+            image("").width(40)
+        };
+
+        column = column.push(
+            row![
+                item_image,
+                pick_list(tm_list(), Some(item), move |selected| {
+                    Message::TmChanged(i, selected)
+                })
+                .width(150)
+                .text_line_height(text::LineHeight::Absolute(10.into())),
+                text_input(&quantity.to_string(), &quantity.to_string())
+                    .on_input(move |input| Message::TmQuantityChanged(i, input))
+                    .line_height(text::LineHeight::Absolute(10.into()))
+                    .width(30)
+                    .size(12),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .width(250)
+            .height(40.0),
+        )
+    }
+    column![text("Machines"), scrollable(column)].align_items(Alignment::Center)
+}
+
+fn keys_bag(bag: Vec<(String, u16)>) -> Column<'static, Message> {
+    let mut column = column![];
+    for (i, (item, quantity)) in bag.into_iter().enumerate() {
+        let item_image = if let Some(item_index) = transpose_item(&item) {
+            if let Some(item_image) =
+                PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
+            {
+                let handle = image::Handle::from_memory(item_image.contents());
+                image(handle).height(40)
+            } else {
+                image("").width(40)
+            }
+        } else {
+            image("").width(40)
+        };
+
+        column = column.push(
+            row![
+                item_image,
+                pick_list(key_list(), Some(item), move |selected| {
+                    Message::KeyChanged(i, selected)
+                })
+                .width(150)
+                .text_line_height(text::LineHeight::Absolute(10.into())),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .width(250)
+            .height(40.0),
+        )
+    }
+    column![text("Key Items"), scrollable(column)].align_items(Alignment::Center)
 }
 
 async fn load() -> Result<(), String> {

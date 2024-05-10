@@ -1,5 +1,5 @@
 use iced::color;
-use iced::widget::text_input;
+use iced::widget::{button, text_input};
 use iced::widget::{column, container, image, mouse_area, pick_list, row, text};
 use iced::{Alignment, Border, Element, Length, Shadow};
 
@@ -8,9 +8,8 @@ use crate::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokemon_info_appearance};
 use crate::widgets::{gender, input_level};
 
-use pk_edit::data_structure::pokemon::{
-    items, species_list, transpose_item, Pokemon, Pokerus, Stats, NATURE,
-};
+use pk_edit::data_structure::pokemon::{Pokemon, Pokerus, Stats};
+use pk_edit::misc::{items, species_list, transpose_item, NATURE};
 
 use crate::slots::move_slot;
 use iced::advanced::layout;
@@ -127,12 +126,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text(hp),
             iced::widget::Space::with_width(Length::Fill),
             text_input(&stats.hp_ev.to_string(), &stats.hp_ev.to_string())
-                .on_input(Message::HPEVChanged)
+                .on_input(|input| Message::EVChanged(String::from("HP"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
             text_input(&stats.hp_iv.to_string(), &stats.hp_iv.to_string())
-                .on_input(Message::HPIVChanged)
+                .on_input(|input| Message::IVChanged(String::from("HP"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(30)
                 .size(12),
@@ -145,12 +144,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text(attack),
             iced::widget::Space::with_width(Length::Fill),
             text_input(&stats.attack_ev.to_string(), &stats.attack_ev.to_string())
-                .on_input(Message::AttackEVChanged)
+                .on_input(|input| Message::EVChanged(String::from("Attack"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
             text_input(&stats.attack_iv.to_string(), &stats.attack_iv.to_string())
-                .on_input(Message::AttackIVChanged)
+                .on_input(|input| Message::IVChanged(String::from("Attack"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(30)
                 .size(12),
@@ -163,12 +162,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text(defense),
             iced::widget::Space::with_width(Length::Fill),
             text_input(&stats.defense_ev.to_string(), &stats.defense_ev.to_string())
-                .on_input(Message::DefenseEVChanged)
+                .on_input(|input| Message::EVChanged(String::from("Defense"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
             text_input(&stats.defense_iv.to_string(), &stats.defense_iv.to_string())
-                .on_input(Message::DefenseIVChanged)
+                .on_input(|input| Message::IVChanged(String::from("Defense"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(30)
                 .size(12),
@@ -180,16 +179,22 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             stat_bar(sp_attack as f32 * scale),
             text(sp_attack),
             iced::widget::Space::with_width(Length::Fill),
-            text_input(&stats.sp_attack_ev.to_string(), &stats.sp_attack_ev.to_string())
-                .on_input(Message::SpAtkEVChanged)
-                .line_height(text::LineHeight::Absolute(10.into()))
-                .width(35)
-                .size(12),
-            text_input(&stats.sp_attack_iv.to_string(), &stats.sp_attack_iv.to_string())
-                .on_input(Message::SpAtkIVChanged)
-                .line_height(text::LineHeight::Absolute(10.into()))
-                .width(30)
-                .size(12),
+            text_input(
+                &stats.sp_attack_ev.to_string(),
+                &stats.sp_attack_ev.to_string()
+            )
+            .on_input(|input| Message::EVChanged(String::from("Sp. Atk"), input))
+            .line_height(text::LineHeight::Absolute(10.into()))
+            .width(35)
+            .size(12),
+            text_input(
+                &stats.sp_attack_iv.to_string(),
+                &stats.sp_attack_iv.to_string()
+            )
+            .on_input(|input| Message::IVChanged(String::from("Sp. Atk"), input))
+            .line_height(text::LineHeight::Absolute(10.into()))
+            .width(30)
+            .size(12),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
@@ -198,16 +203,22 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             stat_bar(sp_defense as f32 * scale),
             text(sp_defense),
             iced::widget::Space::with_width(Length::Fill),
-            text_input(&stats.sp_defense_ev.to_string(), &stats.sp_defense_ev.to_string())
-                .on_input(Message::SpDefEVChanged)
-                .line_height(text::LineHeight::Absolute(10.into()))
-                .width(35)
-                .size(12),
-            text_input(&stats.sp_defense_iv.to_string(), &stats.sp_defense_iv.to_string())
-                .on_input(Message::SpDefIVChanged)
-                .line_height(text::LineHeight::Absolute(10.into()))
-                .width(30)
-                .size(12),
+            text_input(
+                &stats.sp_defense_ev.to_string(),
+                &stats.sp_defense_ev.to_string()
+            )
+            .on_input(|input| Message::EVChanged(String::from("Sp. Def"), input))
+            .line_height(text::LineHeight::Absolute(10.into()))
+            .width(35)
+            .size(12),
+            text_input(
+                &stats.sp_defense_iv.to_string(),
+                &stats.sp_defense_iv.to_string()
+            )
+            .on_input(|input| Message::IVChanged(String::from("Sp. Def"), input))
+            .line_height(text::LineHeight::Absolute(10.into()))
+            .width(30)
+            .size(12),
         ]
         .spacing(5)
         .align_items(Alignment::Center),
@@ -217,12 +228,12 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text(speed),
             iced::widget::Space::with_width(Length::Fill),
             text_input(&stats.speed_ev.to_string(), &stats.speed_ev.to_string())
-                .on_input(Message::SpeedEVChanged)
+                .on_input(|input| Message::EVChanged(String::from("Speed"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
             text_input(&stats.speed_iv.to_string(), &stats.speed_iv.to_string())
-                .on_input(Message::SpeedIVChanged)
+                .on_input(|input| Message::IVChanged(String::from("Speed"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(30)
                 .size(12),
@@ -299,9 +310,18 @@ fn pokemon_info_typing(typing: Option<(String, Option<String>)>) -> Element<'sta
 
 fn info_moves(moves: Vec<(String, String, u8, u8)>) -> Element<'static, Message> {
     let mut column = column![];
+    let len = moves.len();
 
-    for (typing, name, pp_used, pp) in moves {
-        column = column.push(move_slot(&typing, &name, pp_used, pp));
+    for (index, (typing, name, pp_used, pp)) in moves.into_iter().enumerate() {
+        column = column.push(move_slot(index, &typing, &name, pp_used, pp));
+    }
+
+    for i in 0..4_u8.saturating_sub(len as u8) {
+        let position = i as usize + len;
+        let row = row![button("Add Move").on_press(Message::AddMove(position))]
+            .width(WINDOW_WIDTH * 0.33)
+            .align_items(Alignment::Center);
+        column = column.push(row);
     }
 
     container(column)

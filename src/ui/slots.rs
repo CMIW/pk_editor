@@ -7,11 +7,12 @@ use crate::misc::{PROJECT_DIR, WINDOW_WIDTH};
 use crate::theme::{slot_appearance, slot_selected_appearance};
 use crate::widgets::{gender, level};
 
-use pk_edit::data_structure::pokemon::moves;
 use pk_edit::data_structure::pokemon::Pokemon;
+use pk_edit::misc::moves;
 use pk_edit::StorageType;
 
 pub fn move_slot(
+    index: usize,
     move_type: &str,
     move_name: &str,
     pp_used: u8,
@@ -30,11 +31,9 @@ pub fn move_slot(
         row![
             move_icon,
             //text(move_name),
-            pick_list(
-                moves(),
-                Some(move_name.to_string()),
-                Message::NatureSelected
-            )
+            pick_list(moves(), Some(move_name.to_string()), move |selection| {
+                Message::MoveSelected(index, selection)
+            })
             .width(140)
             .text_line_height(text::LineHeight::Absolute(10.into())),
             iced::widget::Space::with_width(Length::Fill),
@@ -62,7 +61,7 @@ fn pp(pp_used: u8, pp_total: u8) -> Container<'static, Message> {
 }
 
 pub fn pc_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
-    let apperance = if id == &pokemon.offset() && !pokemon.is_empty(){
+    let apperance = if id == &pokemon.offset() && !pokemon.is_empty() {
         slot_selected_appearance()
     } else {
         slot_appearance()
@@ -93,8 +92,7 @@ pub fn pc_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
                 .align_x(iced::alignment::Horizontal::Center)
                 .align_y(iced::alignment::Vertical::Bottom);
 
-            mouse_area(container)
-                .on_press(Message::SelectedPokemon((StorageType::PC, *pokemon)))
+            mouse_area(container).on_press(Message::SelectedPokemon((StorageType::PC, *pokemon)))
         }
         true => {
             let container = container("")
@@ -104,8 +102,7 @@ pub fn pc_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> {
                 .align_x(iced::alignment::Horizontal::Center)
                 .align_y(iced::alignment::Vertical::Bottom);
 
-            mouse_area(container)
-                .on_press(Message::SelectedPokemon((StorageType::PC, *pokemon)))
+            mouse_area(container).on_press(Message::SelectedPokemon((StorageType::PC, *pokemon)))
         }
     }
 }
@@ -155,10 +152,7 @@ pub fn party_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> 
                 .padding(Padding::from([0, 10])) // top/bottom, left/right
                 .style(apperance);
 
-            mouse_area(container).on_press(Message::SelectedPokemon((
-                StorageType::Party,
-                *pokemon,
-            )))
+            mouse_area(container).on_press(Message::SelectedPokemon((StorageType::Party, *pokemon)))
         }
         true => {
             let container = container("")
@@ -167,10 +161,7 @@ pub fn party_slot(id: &usize, pokemon: &Pokemon) -> MouseArea<'static, Message> 
                 .padding(Padding::from([0, 10])) // top/bottom, left/right
                 .style(apperance);
 
-            mouse_area(container).on_press(Message::SelectedPokemon((
-                StorageType::Party,
-                *pokemon,
-            )))
+            mouse_area(container).on_press(Message::SelectedPokemon((StorageType::Party, *pokemon)))
         }
     }
 }
