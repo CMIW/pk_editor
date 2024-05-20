@@ -7,8 +7,8 @@ use iced::widget::{button, column, container, pick_list, row, scrollable, text, 
 use iced::Settings;
 use iced::{Alignment, Command, Element, Size, Theme};
 
-use iced::widget::scrollable::Properties;
 use iced::widget::scrollable::Direction;
+use iced::widget::scrollable::Properties;
 use iced::widget::Scrollable;
 
 use std::path::PathBuf;
@@ -22,7 +22,7 @@ use pk_editor::pc::pc_box;
 use pk_editor::pokemon_info::pokemon_info;
 
 use pk_edit::data_structure::pokemon::{gen_pokemon_from_species, Pokemon, Pokerus};
-use pk_edit::misc::{key_list, tm_list, berries_list, balls_list, items_list, transpose_item};
+use pk_edit::misc::{balls_list, berries_list, items_list, key_list, tm_list, transpose_item};
 use pk_edit::{SaveFile, StorageType};
 
 fn main() -> iced::Result {
@@ -453,15 +453,14 @@ impl Application for State {
         let bag_view = row![column![
             controls,
             if !self.save_file.is_empty() {
-                row![
-                    Scrollable::new(row![
+                row![Scrollable::new(row![
                     items_bag(self.item_bag.clone()),
                     balls_bag(self.ball_bag.clone()),
                     tms_bag(self.tm_bag.clone()),
                     berries_bag(self.berry_bag.clone()),
                     keys_bag(self.key_bag.clone()),
-                ]).direction(Direction::Horizontal(Properties::new()))
-                ]
+                ])
+                .direction(Direction::Horizontal(Properties::new()))]
             } else {
                 row![]
             }
