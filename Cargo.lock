@@ -2521,6 +2521,7 @@ dependencies = [
 [[package]]
 name = "pk_edit"
 version = "0.1.0"
+source = "git+https://github.com/CMIW/pk_edit.git#1845ed9cf110267d059e891b268a4d0a1ee9c076"
 dependencies = [
  "byteorder",
  "csv",

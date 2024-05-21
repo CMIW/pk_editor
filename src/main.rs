@@ -98,10 +98,16 @@ impl Application for State {
                 self.error = Some(error);
                 Command::none()
             }
-            Message::FileSaved(Ok(path)) => Command::perform(
-                write_file(path, Some(Arc::new(self.save_file.raw_data()))),
-                Message::WriteFile,
-            ),
+            Message::FileSaved(Ok(path)) => {
+                if !self.save_file.is_empty() {
+                    Command::perform(
+                        write_file(path, Some(Arc::new(self.save_file.raw_data()))),
+                        Message::WriteFile,
+                    )
+                } else {
+                    Command::none()
+                }
+            }
             Message::FileSaved(Err(error)) => {
                 self.error = Some(error);
                 Command::none()
