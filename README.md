@@ -2,7 +2,7 @@
 Pokemon Gen 3 editor made with [Iced](https://docs.rs/iced/latest/iced/).
 Provides utilities to modify save files from Pokémon games such as Ruby, Sapphire, Emerald, FireRed, and LeafGreen.
 
-Work in progress so the program can crash with unexpected behaviour.
+Supports Linux and Windows, it's a work in progress so the program can crash with unexpected behaviour.
 
 ![main](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot55.png)
 ![party](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot36.png)
