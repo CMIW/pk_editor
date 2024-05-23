@@ -19,6 +19,8 @@ Supports Linux and Windows, it's a work in progress so the program can crash wit
 
 •Edit Pokerus status
 
+•Edit friendship 
+
 •Edit trainer bag
 
 ![main](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot55.png)
