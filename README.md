@@ -6,13 +6,20 @@ Supports Linux and Windows, it's a work in progress so the program can crash wit
 
 ## Features 
 •Gen new Pokemon (it's completely *illegal*, always the same PID)
+
 •Edit species  
--Edit moves
--Edit stats
--Edit lvl
--Edit held item
--Edit Pokerus status
--Edit trainer bag
+
+•Edit moves
+
+•Edit stats
+
+•Edit lvl
+
+•Edit held item
+
+•Edit Pokerus status
+
+•Edit trainer bag
 
 ![main](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot55.png)
 ![party](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot36.png)
