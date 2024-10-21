@@ -27,11 +27,18 @@ pub fn move_slot(
 
     let move_icon = image(handle)/*.width(45).height(45)*/;
 
+    let moves = match moves() {
+        Ok(ms) => ms,
+        Err(err) => {
+            println!("{}", err);
+            vec![String::from("")]
+        }
+    };
+
     container(
         row![
             move_icon,
-            //text(move_name),
-            pick_list(moves(), Some(move_name.to_string()), move |selection| {
+            pick_list(moves, Some(move_name.to_string()), move |selection| {
                 Message::MoveSelected(index, selection)
             })
             .width(140)

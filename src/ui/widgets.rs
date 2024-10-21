@@ -1,7 +1,7 @@
 use iced::color;
 use iced::widget::Container;
 use iced::widget::{container, row, text, text_input};
-use iced::{Border, Color, Element, Shadow};
+use iced::{Border, Color, Shadow};
 use pk_edit::data_structure::pokemon::Gender;
 
 use crate::message::Message;
@@ -58,7 +58,7 @@ fn level_appearance() -> iced::widget::container::Appearance {
     }
 }
 
-fn input_appearance() -> iced::widget::text_input::Appearance {
+fn _input_appearance() -> iced::widget::text_input::Appearance {
     iced::widget::text_input::Appearance {
         background: iced::Background::Color(Color::TRANSPARENT),
         border: Border {

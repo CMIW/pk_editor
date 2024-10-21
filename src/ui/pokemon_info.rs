@@ -9,7 +9,7 @@ use crate::theme::{info_label_appearance, pokemon_info_appearance};
 use crate::widgets::{gender, input_level};
 
 use pk_edit::data_structure::pokemon::{Pokemon, Pokerus, Stats};
-use pk_edit::misc::{items, species_list, transpose_item, NATURE};
+use pk_edit::misc::{held_items, item_id, species, NATURE};
 
 use crate::slots::move_slot;
 use iced::advanced::layout;
@@ -328,24 +328,26 @@ fn info_moves(moves: Vec<(String, String, u8, u8)>) -> Element<'static, Message>
         .width(WINDOW_WIDTH * 0.33)
         .height(160)
         .style(pokemon_info_appearance())
-        .align_y(iced::alignment::Vertical::Top)
-        .align_x(iced::alignment::Horizontal::Center)
+        .align_y(iced::alignment::Vertical::Center)
+        .align_x(iced::alignment::Horizontal::Left)
         .into()
 }
 
 pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     let label = info_label(pokemon);
 
+    let species = match species() {
+        Ok(sps) => sps,
+        Err(_) => {
+            vec![String::from("")]
+        }
+    };
+
     let dex_species_lang = row![
         text(format!("No. {}", pokemon.nat_dex_number())),
-        //text(pokemon.species()),
-        pick_list(
-            species_list(),
-            Some(pokemon.species()),
-            Message::SpeciesSelected
-        )
-        .width(130)
-        .text_line_height(text::LineHeight::Absolute(10.into())),
+        pick_list(species, Some(pokemon.species()), Message::SpeciesSelected)
+            .width(130)
+            .text_line_height(text::LineHeight::Absolute(10.into())),
         iced::widget::Space::with_width(Length::Fill),
         text(pokemon.language()),
         iced::widget::Space::with_width(45),
@@ -354,20 +356,12 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     .align_items(Alignment::Center)
     .padding([5, 10, 5, 15]); // top, right, bottom, left
 
-    let ot = container(row![
-        row![
-            text("OT Name").style(iced::theme::Text::Color(color!(0xffcc00))),
-            iced::widget::Space::with_width(10),
-            text(pokemon.ot_name()),
-        ]
-        .width((WINDOW_WIDTH * 0.33) / 2.0),
-        /*row![
-            text("Ability").style(iced::theme::Text::Color(color!(0xffcc00))),
-            iced::widget::Space::with_width(15),
-            text(pokemon.ability()),
-        ]
-        .width((WINDOW_WIDTH * 0.33) / 2.0),*/
-    ])
+    let ot = container(row![row![
+        text("OT Name").style(iced::theme::Text::Color(color!(0xffcc00))),
+        iced::widget::Space::with_width(10),
+        text(pokemon.ot_name()),
+    ]
+    .width((WINDOW_WIDTH * 0.33) / 2.0),])
     .width(WINDOW_WIDTH * 0.33)
     .height(40.0)
     .align_y(iced::alignment::Vertical::Center)
@@ -406,7 +400,6 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         row![
             text("Nature").style(iced::theme::Text::Color(color!(0xffcc00))),
             iced::widget::Space::with_width(10),
-            //text(pokemon.nature()),
             pick_list(
                 NATURE.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
                 Some(pokemon.nature()),
@@ -430,17 +423,25 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     .padding([5, 15])
     .style(pokemon_info_appearance());
 
-    let item_image = if let Some(item_index) = transpose_item(&pokemon.held_item()) {
-        if let Some(item_image) =
-            PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
-        {
-            let handle = image::Handle::from_memory(item_image.contents());
-            image(handle).height(25)
-        } else {
-            image("").height(30)
-        }
+    let item_id = match item_id(&pokemon.held_item()) {
+        Ok(id) => id,
+        Err(_) => 0,
+    };
+
+    let item_image = if let Some(item_image) =
+        PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
+    {
+        let handle = image::Handle::from_memory(item_image.contents());
+        image(handle).height(25)
     } else {
         image("").height(30)
+    };
+
+    let held_items = match held_items() {
+        Ok(is) => is,
+        Err(_) => {
+            vec![String::from("")]
+        }
     };
 
     let item = container(
@@ -450,7 +451,7 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
             item_image,
             iced::widget::Space::with_width(5),
             pick_list(
-                items(),
+                held_items,
                 Some(pokemon.held_item()),
                 Message::HeldItemSelected
             )
