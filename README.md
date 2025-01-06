@@ -4,10 +4,9 @@ Provides utilities to modify save files from Pokémon games such as Ruby, Sapphi
 
 Work in progress so the program can crash with unexpected behaviour.
 
-![main](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot55.png)
-![party](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot36.png)
-![items](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot07.png)
-![bag](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot18.png)
+![main](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot01.png)
+![main](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot02.png)
+![bag](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot03.png)
 
 ## Documentation
 In progress

@@ -6,11 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iced = { version = "0.12.1", features = ["lazy", "advanced", "tokio", "image", "debug"] }
+iced = { version = "0.13.1", features = ["tokio", "advanced", "image", "svg"] }
 tokio = { version = "1.37.0", features = ["fs"] }
 rfd = "0.14.1"
-thiserror = "1.0.59"
+thiserror = "2.0.9"
 include_dir = "0.7.3"
-#pk_edit = { git = "https://github.com/CMIW/pk_edit.git"}
-pk_edit = { path = "../pk_edit"}
-iced_aw =  { version = "0.8.0", features = ["number_input","icons",] }
+pk_edit = { git = "https://github.com/CMIW/pk_edit.git"}
+#pk_edit = { path = "../pk_edit"}
+
+[build-dependencies]
+iced_fontello = "0.13"
