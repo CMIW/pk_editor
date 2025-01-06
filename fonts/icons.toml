@@ -1,0 +1,9 @@
+module = "icon"
+
+[glyphs]
+edit = "fontawesome-edit"
+save = "fontawesome-floppy"
+open = "fontawesome-folder-open"
+left = "fontawesome-left-open"
+right = "fontawesome-right-open"
+#pokeball = "pokeball.svg"

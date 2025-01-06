@@ -1,32 +1,26 @@
 use iced::color;
 use iced::widget::{button, text_input};
 use iced::widget::{column, container, image, mouse_area, pick_list, row, text};
-use iced::{Alignment, Border, Element, Length, Shadow};
+use iced::{Alignment, Element, Length};
 
 use crate::message::Message;
 use crate::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokemon_info_appearance};
-use crate::widgets::{gender, input_level};
+use crate::widgets::input_level;
 
 use pk_edit::data_structure::pokemon::{Pokemon, Pokerus, Stats};
-use pk_edit::misc::{items, species_list, transpose_item, NATURE};
+use pk_edit::misc::{held_items, item_id, species, NATURE};
 
-use crate::slots::move_slot;
-use iced::advanced::layout;
-use iced::advanced::mouse;
-use iced::advanced::renderer;
-use iced::advanced::widget::Tree;
-use iced::advanced::Layout;
-use iced::advanced::Widget;
-use iced::Rectangle;
-use iced::Size;
-use iced::Theme;
+use crate::pick_list_default;
+use crate::stat_bar;
+use crate::widgets::gender;
+use crate::widgets::move_slot;
 
 fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
     let pokeball = if pokemon.pokeball_caught() == 0 {
         image("").width(45).height(45)
     } else {
-        let handle = image::Handle::from_memory(
+        let handle = image::Handle::from_bytes(
             PROJECT_DIR
                 .get_file(format!(
                     "Items/item_{:0width$}.png",
@@ -42,27 +36,27 @@ fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
 
     let pokerus = match pokemon.pokerus_status() {
         Pokerus::None => {
-            let pokerus_handle = image::Handle::from_memory(
+            let pokerus_handle = image::Handle::from_bytes(
                 PROJECT_DIR
-                    .get_file("PokérusIC_not_infected.png")
+                    .get_file("icons/PokérusIC_not_infected.png")
                     .unwrap()
                     .contents(),
             );
             image(pokerus_handle).width(30).height(30)
         }
         Pokerus::Infected => {
-            let pokerus_handle = image::Handle::from_memory(
+            let pokerus_handle = image::Handle::from_bytes(
                 PROJECT_DIR
-                    .get_file("PokérusIC_infected.png")
+                    .get_file("icons/PokérusIC_infected.png")
                     .unwrap()
                     .contents(),
             );
             image(pokerus_handle).width(30).height(30)
         }
         Pokerus::Cured => {
-            let pokerus_handle = image::Handle::from_memory(
+            let pokerus_handle = image::Handle::from_bytes(
                 PROJECT_DIR
-                    .get_file("PokérusIC_cured.png")
+                    .get_file("icons/PokérusIC_cured.png")
                     .unwrap()
                     .contents(),
             );
@@ -70,9 +64,11 @@ fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
         }
     };
 
-    let pokerus = mouse_area(pokerus).on_press(Message::ChangePokerusStatus);
+    let pokerus = mouse_area(pokerus)
+        .interaction(iced::mouse::Interaction::Pointer)
+        .on_press(Message::ChangePokerusStatus);
 
-    let name = text(pokemon.nickname());
+    let name = text(pokemon.nickname()).shaping(text::Shaping::Advanced);
 
     let row = row![
         pokeball,
@@ -83,14 +79,14 @@ fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
         input_level(pokemon.level()),
         gender(pokemon.gender()),
     ]
-    .align_items(Alignment::Center)
+    .align_y(Alignment::Center)
     .spacing(5)
-    .padding([5, 20, 5, 20]); // top, right, bottom, left
+    .padding([5, 20]); // top, right, bottom, left
 
     container(row)
         .width(WINDOW_WIDTH * 0.33)
         .height(50.0)
-        .style(info_label_appearance())
+        .style(info_label_appearance)
         .align_y(iced::alignment::Vertical::Center)
         .align_x(iced::alignment::Horizontal::Left)
         .into()
@@ -113,13 +109,13 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             iced::widget::Space::with_width(Length::Fill),
             text("EV")
                 .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
+                /*.horizontal_alignment(iced::alignment::Horizontal::Center)*/,
             text("IV")
                 .width(ev_iv_width)
-                .horizontal_alignment(iced::alignment::Horizontal::Center),
+                /*.horizontal_alignment(iced::alignment::Horizontal::Center)*/,
         ]
         .spacing(5)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
         row![
             text("HP:").width(labels_width),
             stat_bar(hp as f32 * scale),
@@ -137,7 +133,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .size(12),
         ]
         .spacing(5)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
         row![
             text("Attack:").width(labels_width),
             stat_bar(attack as f32 * scale),
@@ -155,7 +151,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .size(12),
         ]
         .spacing(5)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
         row![
             text("Defense:").width(labels_width),
             stat_bar(defense as f32 * scale),
@@ -173,7 +169,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .size(12),
         ]
         .spacing(5)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
         row![
             text("Sp. Atk:").width(labels_width),
             stat_bar(sp_attack as f32 * scale),
@@ -197,7 +193,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             .size(12),
         ]
         .spacing(5)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
         row![
             text("Sp. Def:").width(labels_width),
             stat_bar(sp_defense as f32 * scale),
@@ -221,7 +217,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             .size(12),
         ]
         .spacing(5)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
         row![
             text("Speed:").width(labels_width),
             stat_bar(speed as f32 * scale),
@@ -239,7 +235,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
                 .size(12),
         ]
         .spacing(5)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
     ]
     .padding([0, 10]) // top/bottom left/right
     .spacing(5);
@@ -252,14 +248,14 @@ fn pokemon_info_typing(typing: Option<(String, Option<String>)>) -> Element<'sta
         None => container("")
             .width(WINDOW_WIDTH * 0.33)
             .height(40.0)
-            .style(pokemon_info_appearance())
+            .style(pokemon_info_appearance)
             .align_y(iced::alignment::Vertical::Center)
             .align_x(iced::alignment::Horizontal::Left)
             .padding([5, 15])
             .into(),
         Some(tuple) => match tuple {
             (type1, None) => {
-                let handle1 = image::Handle::from_memory(
+                let handle1 = image::Handle::from_bytes(
                     PROJECT_DIR
                         .get_file(format!("Types/{}IC_SV.png", type1))
                         .unwrap()
@@ -271,21 +267,21 @@ fn pokemon_info_typing(typing: Option<(String, Option<String>)>) -> Element<'sta
                 container(row![type1].spacing(5))
                     .width(WINDOW_WIDTH * 0.33)
                     .height(40.0)
-                    .style(pokemon_info_appearance())
+                    .style(pokemon_info_appearance)
                     .align_y(iced::alignment::Vertical::Center)
                     .align_x(iced::alignment::Horizontal::Left)
                     .padding([5, 15])
                     .into()
             }
             (type1, Some(type2)) => {
-                let handle1 = image::Handle::from_memory(
+                let handle1 = image::Handle::from_bytes(
                     PROJECT_DIR
                         .get_file(format!("Types/{}IC_SV.png", type1))
                         .unwrap()
                         .contents(),
                 );
 
-                let handle2 = image::Handle::from_memory(
+                let handle2 = image::Handle::from_bytes(
                     PROJECT_DIR
                         .get_file(format!("Types/{}IC_SV.png", type2))
                         .unwrap()
@@ -298,7 +294,7 @@ fn pokemon_info_typing(typing: Option<(String, Option<String>)>) -> Element<'sta
                 container(row![type1, type2].spacing(5))
                     .width(WINDOW_WIDTH * 0.33)
                     .height(40.0)
-                    .style(pokemon_info_appearance())
+                    .style(pokemon_info_appearance)
                     .align_y(iced::alignment::Vertical::Center)
                     .align_x(iced::alignment::Horizontal::Left)
                     .padding([5, 15])
@@ -318,73 +314,75 @@ fn info_moves(moves: Vec<(String, String, u8, u8)>) -> Element<'static, Message>
 
     for i in 0..4_u8.saturating_sub(len as u8) {
         let position = i as usize + len;
-        let row = row![button("Add Move").on_press(Message::AddMove(position))]
-            .width(WINDOW_WIDTH * 0.33)
-            .align_items(Alignment::Center);
+        let row = row![button(text("+").center())
+            .on_press(Message::AddMove(position))
+            .width(270),]
+        .width(WINDOW_WIDTH * 0.33)
+        .padding([5, 15])
+        .align_y(Alignment::Center);
         column = column.push(row);
     }
 
     container(column)
         .width(WINDOW_WIDTH * 0.33)
         .height(160)
-        .style(pokemon_info_appearance())
-        .align_y(iced::alignment::Vertical::Top)
-        .align_x(iced::alignment::Horizontal::Center)
+        .style(pokemon_info_appearance)
+        .align_y(iced::alignment::Vertical::Center)
+        .align_x(iced::alignment::Horizontal::Left)
         .into()
 }
 
 pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     let label = info_label(pokemon);
 
+    let species = match species() {
+        Ok(sps) => sps,
+        Err(_) => {
+            vec![String::from("")]
+        }
+    };
+
     let dex_species_lang = row![
         text(format!("No. {}", pokemon.nat_dex_number())),
-        //text(pokemon.species()),
-        pick_list(
-            species_list(),
-            Some(pokemon.species()),
-            Message::SpeciesSelected
-        )
-        .width(130)
-        .text_line_height(text::LineHeight::Absolute(10.into())),
+        pick_list(species, Some(pokemon.species()), Message::SpeciesSelected)
+            .width(130)
+            .style(pick_list_default),
         iced::widget::Space::with_width(Length::Fill),
-        text(pokemon.language()),
+        text(pokemon.language().to_string()),
         iced::widget::Space::with_width(45),
     ]
     .spacing(20)
-    .align_items(Alignment::Center)
-    .padding([5, 10, 5, 15]); // top, right, bottom, left
+    .align_y(Alignment::Center)
+    .padding(iced::Padding {
+        top: 5.0,
+        right: 10.0,
+        bottom: 5.0,
+        left: 15.0,
+    }); // top, right, bottom, left
 
-    let ot = container(row![
-        row![
-            text("OT Name").style(iced::theme::Text::Color(color!(0xffcc00))),
-            iced::widget::Space::with_width(10),
-            text(pokemon.ot_name()),
-        ]
-        .width((WINDOW_WIDTH * 0.33) / 2.0),
-        /*row![
-            text("Ability").style(iced::theme::Text::Color(color!(0xffcc00))),
-            iced::widget::Space::with_width(15),
-            text(pokemon.ability()),
-        ]
-        .width((WINDOW_WIDTH * 0.33) / 2.0),*/
-    ])
+    let ot = container(row![row![
+        text("OT Name").color(color!(0xffcc00)),
+        iced::widget::Space::with_width(10),
+        text(pokemon.ot_name()),
+    ]
+    .width((WINDOW_WIDTH * 0.33) / 2.0),])
     .width(WINDOW_WIDTH * 0.33)
     .height(40.0)
     .align_y(iced::alignment::Vertical::Center)
     .align_x(iced::alignment::Horizontal::Left)
     .padding([5, 15])
-    .style(pokemon_info_appearance());
+    .style(pokemon_info_appearance);
 
     let pid_friendship = container(row![
         row![
-            text("PID").style(iced::theme::Text::Color(color!(0xffcc00))),
+            text("PID").color(color!(0xffcc00)),
             iced::widget::Space::with_width(30),
             text(format!("{:X}", pokemon.personality_value()))
         ]
         .width((WINDOW_WIDTH * 0.33) / 2.0)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
         row![
-            text("Friendship").style(iced::theme::Text::Color(color!(0xffcc00))),
+            text("Friendship").color(color!(0xffcc00)),
             iced::widget::Space::with_width(Length::Fill),
             text_input(
                 &pokemon.friendship().to_string(),
@@ -404,23 +402,26 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
 
     let nature_ability = container(row![
         row![
-            text("Nature").style(iced::theme::Text::Color(color!(0xffcc00))),
+            text("Nature").color(color!(0xffcc00)),
             iced::widget::Space::with_width(10),
-            //text(pokemon.nature()),
             pick_list(
                 NATURE.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
                 Some(pokemon.nature()),
                 Message::NatureSelected
             )
             .width(100)
-            .text_line_height(text::LineHeight::Absolute(10.into())),
+            .style(pick_list_default),
         ]
+        .height(40.0)
+        .align_y(iced::alignment::Vertical::Center)
         .width((WINDOW_WIDTH * 0.33) / 2.0),
         row![
-            text("Ability").style(iced::theme::Text::Color(color!(0xffcc00))),
+            text("Ability").color(color!(0xffcc00)),
             iced::widget::Space::with_width(15),
             text(pokemon.ability()),
         ]
+        .height(40.0)
+        .align_y(iced::alignment::Vertical::Center)
         .width((WINDOW_WIDTH * 0.33) / 2.0),
     ])
     .width(WINDOW_WIDTH * 0.33)
@@ -428,37 +429,45 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     .align_y(iced::alignment::Vertical::Center)
     .align_x(iced::alignment::Horizontal::Left)
     .padding([5, 15])
-    .style(pokemon_info_appearance());
+    .style(pokemon_info_appearance);
 
-    let item_image = if let Some(item_index) = transpose_item(&pokemon.held_item()) {
-        if let Some(item_image) =
-            PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_index, width = 4))
-        {
-            let handle = image::Handle::from_memory(item_image.contents());
-            image(handle).height(25)
-        } else {
-            image("").height(30)
-        }
+    let item_id = match item_id(&pokemon.held_item()) {
+        Ok(id) => id,
+        Err(_) => 0,
+    };
+
+    let item_image = if let Some(item_image) =
+        PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
+    {
+        let handle = image::Handle::from_bytes(item_image.contents());
+        image(handle).height(25)
     } else {
         image("").height(30)
     };
 
+    let held_items = match held_items() {
+        Ok(is) => is,
+        Err(_) => {
+            vec![String::from("")]
+        }
+    };
+
     let item = container(
         row![
-            text("Held Item").style(iced::theme::Text::Color(color!(0xffcc00))),
+            text("Held Item").color(color!(0xffcc00)),
             iced::widget::Space::with_width(5),
             item_image,
             iced::widget::Space::with_width(5),
             pick_list(
-                items(),
+                held_items,
                 Some(pokemon.held_item()),
                 Message::HeldItemSelected
             )
             .width(150)
-            .text_line_height(text::LineHeight::Absolute(10.into())),
+            .style(pick_list_default),
             iced::widget::Space::with_width(Length::Fill),
         ]
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
     )
     .width(WINDOW_WIDTH * 0.33)
     .height(40.0)
@@ -472,8 +481,9 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
         label,
         dex_species_lang,
         pokemon_info_typing(pokemon.typing()),
+        iced::widget::Space::with_height(10),
         stats(pokemon.stats(), pokemon.level()),
-        iced::widget::Space::with_height(Length::Fill),
+        iced::widget::Space::with_height(10),
         ot,
         pid_friendship,
         nature_ability,
@@ -483,94 +493,8 @@ pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
     ])
     .width(WINDOW_WIDTH * 0.33)
     .height(WINDOW_HEIGHT)
-    .style(pokemon_info_appearance())
+    .style(pokemon_info_appearance)
     .align_y(iced::alignment::Vertical::Top)
     .align_x(iced::alignment::Horizontal::Center)
     .into()
-}
-
-fn stat_bar(width: f32) -> StatBar {
-    StatBar::new(width)
-}
-
-struct StatBar {
-    size: iced::Size,
-}
-
-impl StatBar {
-    pub fn new(width: f32) -> Self {
-        Self {
-            size: Size::new(width, 15.0),
-        }
-    }
-}
-
-impl<Message, Renderer> Widget<Message, Theme, Renderer> for StatBar
-where
-    Renderer: iced::advanced::Renderer,
-{
-    fn size(&self) -> Size<Length> {
-        Size {
-            width: Length::Shrink,
-            height: Length::Shrink,
-        }
-    }
-
-    fn layout(
-        &self,
-        _tree: &mut Tree,
-        _renderer: &Renderer,
-        _limits: &layout::Limits,
-    ) -> layout::Node {
-        layout::Node::new(self.size)
-    }
-
-    fn draw(
-        &self,
-        _state: &Tree,
-        renderer: &mut Renderer,
-        _theme: &Theme,
-        _style: &renderer::Style,
-        layout: Layout<'_>,
-        _cursor: mouse::Cursor,
-        _viewport: &Rectangle,
-    ) {
-        let color = match self.size.width {
-            val if val >= 150.0 => color!(0x00c2b8),
-            val if val >= 120.0 => color!(0x23cd5e),
-            val if val >= 90.0 => color!(0xa0e515),
-            val if val >= 60.0 => color!(0xffdd57),
-            _ => color!(0xff7f0f),
-        };
-
-        let border_color = match self.size.width {
-            val if val >= 150.0 => color!(0x00a59d),
-            val if val >= 120.0 => color!(0x1eaf50),
-            val if val >= 90.0 => color!(0x88c312),
-            val if val >= 60.0 => color!(0xd9bc4a),
-            _ => color!(0xd96c0d),
-        };
-
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: layout.bounds(),
-                border: Border {
-                    color: border_color,
-                    width: 1.0,
-                    radius: 10.0.into(),
-                },
-                shadow: Shadow::default(),
-            },
-            color,
-        );
-    }
-}
-
-impl<'a, Message, Renderer> From<StatBar> for Element<'a, Message, Theme, Renderer>
-where
-    Renderer: iced::advanced::Renderer,
-{
-    fn from(widget: StatBar) -> Self {
-        Self::new(widget)
-    }
 }
