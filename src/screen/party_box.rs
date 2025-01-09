@@ -11,6 +11,7 @@ use crate::{widgets::party, widgets::pc_box};
 use pk_edit::Pokemon;
 
 pub fn party_box<'a>(
+    cb_state: &'a iced::widget::combo_box::State<String>,
     selected: &Option<Id>,
     selected_tab: &Option<Id>,
     selected_pokemon: &Option<Pokemon>,
@@ -30,7 +31,7 @@ pub fn party_box<'a>(
         ]
         .spacing(15),
         if let Some(selected_pokemon) = selected_pokemon {
-            pokemon_info(&selected_pokemon)
+            pokemon_info(cb_state, &selected_pokemon)
         } else {
             container("").into()
         },
