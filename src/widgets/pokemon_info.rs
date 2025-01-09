@@ -1,6 +1,6 @@
 use iced::color;
 use iced::widget::{button, text_input};
-use iced::widget::{column, container, image, mouse_area, pick_list, row, text};
+use iced::widget::{column, container, image, mouse_area, combo_box, pick_list, row, text};
 use iced::{Alignment, Element, Length};
 
 use crate::message::Message;
@@ -11,7 +11,7 @@ use crate::widgets::input_level;
 use pk_edit::data_structure::pokemon::{Pokemon, Pokerus, Stats};
 use pk_edit::misc::{held_items, item_id, species, NATURE};
 
-use crate::pick_list_default;
+use crate::{pick_list_default, text_input_default};
 use crate::stat_bar;
 use crate::widgets::gender;
 use crate::widgets::move_slot;
@@ -332,21 +332,14 @@ fn info_moves(moves: Vec<(String, String, u8, u8)>) -> Element<'static, Message>
         .into()
 }
 
-pub fn pokemon_info(pokemon: &Pokemon) -> Element<'static, Message> {
+pub fn pokemon_info<'a>(state: &'a iced::widget::combo_box::State<String>, pokemon: &Pokemon) -> Element<'a, Message> {
     let label = info_label(pokemon);
-
-    let species = match species() {
-        Ok(sps) => sps,
-        Err(_) => {
-            vec![String::from("")]
-        }
-    };
 
     let dex_species_lang = row![
         text(format!("No. {}", pokemon.nat_dex_number())),
-        pick_list(species, Some(pokemon.species()), Message::SpeciesSelected)
+        combo_box(state, "Select Pokemon species...", Some(&pokemon.species()), Message::SpeciesSelected)
             .width(130)
-            .style(pick_list_default),
+            .input_style(text_input_default),
         iced::widget::Space::with_width(Length::Fill),
         text(pokemon.language().to_string()),
         iced::widget::Space::with_width(45),

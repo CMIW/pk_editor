@@ -114,6 +114,28 @@ pub fn pick_list_default(
     }
 }
 
+pub fn text_input_default(
+    theme: &iced::Theme,
+    status: iced::widget::text_input::Status,
+) -> iced::widget::text_input::Style {
+    let palette = theme.extended_palette();
+    match status {
+        iced::widget::text_input::Status::Active | iced::widget::text_input::Status::Focused => {
+            iced::widget::text_input::Style {
+                background: iced::Background::Color(iced::Color::TRANSPARENT),
+                placeholder: palette.background.base.color,
+                border: iced::Border::default(),
+                ..iced::widget::text_input::default(theme, status)
+            }
+        }
+        _ => iced::widget::text_input::Style {
+            background: iced::Background::Color(iced::Color::TRANSPARENT),
+            placeholder: palette.background.base.color,
+            ..iced::widget::text_input::default(theme, status)
+        },
+    }
+}
+
 pub fn tab_bar_tab(theme: &iced::Theme, status: crate::tab::Status) -> crate::tab::Style {
     crate::tab::primary(theme, status)
 }

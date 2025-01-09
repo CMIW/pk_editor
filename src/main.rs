@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 use iced::widget::container;
 use iced::{Element, Task, Theme};
 
@@ -45,6 +46,7 @@ pub struct State {
     ball_bag: Vec<(String, u16)>,
     berry_bag: Vec<(String, u16)>,
     selected_pokemon_storage: StorageType,
+    cb_state: iced::widget::combo_box::State<String>,
 }
 
 #[derive(Debug)]
@@ -56,6 +58,15 @@ pub enum Screen {
 
 impl State {
     fn new() -> (Self, Task<Message>) {
+        use pk_edit::misc::species;
+
+        let species = match species() {
+            Ok(sps) => sps,
+            Err(_) => {
+                vec![String::from("")]
+            }
+        };
+
         (
             State {
                 error: None,
@@ -75,6 +86,7 @@ impl State {
                 party: vec![Pokemon::default(); 6],
                 current_pc: vec![Pokemon::default(); 30],
                 selected_pokemon_storage: StorageType::None,
+                cb_state: iced::widget::combo_box::State::new(species),
             },
             Task::none(),
         )
@@ -439,8 +451,20 @@ impl State {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        use pk_edit::misc::species;
+
+        let species = match species() {
+            Ok(sps) => sps,
+            Err(_) => {
+                vec![String::from("")]
+            }
+        };
+
+        let cb_state = iced::widget::combo_box::State::new(species);
+
         container(match self.screen {
             Some(Screen::PartyBoxes) => party_box(
+                &self.cb_state,
                 &self.selected,
                 &self.selected_tab,
                 &self.selected_pokemon,
