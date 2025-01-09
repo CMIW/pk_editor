@@ -46,7 +46,7 @@ pub fn menu_bar<'a>(selected_tab: &Option<Id>) -> Element<'a, Message> {
                     .contents()
             ))
             .height(20.0),
-            text("Bag")
+            text("Bag & Trainer")
         ]
         .spacing(5.0)
         .align_y(iced::alignment::Vertical::Center))
@@ -54,11 +54,6 @@ pub fn menu_bar<'a>(selected_tab: &Option<Id>) -> Element<'a, Message> {
         .style(tab_bar_tab)
         .selected(selected_tab)
         .on_press(Message::SelectedTab(Id::new("2"))),
-        tab("Trainer")
-            .id(Id::new("3"))
-            .style(tab_bar_tab)
-            .selected(selected_tab)
-            .on_press(Message::SelectedTab(Id::new("3"))),
     ])
     .style(menu_bar_default)
     .into()

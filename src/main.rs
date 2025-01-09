@@ -52,8 +52,7 @@ pub struct State {
 #[derive(Debug)]
 pub enum Screen {
     PartyBoxes,
-    Bag,
-    Trainer,
+    BagTrainer,
 }
 
 impl State {
@@ -169,9 +168,7 @@ impl State {
                 if self.selected_tab == Some(Id::new("1")) {
                     self.screen = Some(Screen::PartyBoxes);
                 } else if self.selected_tab == Some(Id::new("2")) {
-                    self.screen = Some(Screen::Bag);
-                } else if self.selected_tab == Some(Id::new("3")) {
-                    self.screen = Some(Screen::Trainer);
+                    self.screen = Some(Screen::BagTrainer);
                 }
 
                 Task::none()
@@ -472,7 +469,7 @@ impl State {
                 &self.current_pc_index,
                 &self.current_pc,
             ),
-            Some(Screen::Bag) => bag(
+            Some(Screen::BagTrainer) => bag(
                 &self.selected_bag,
                 &self.selected_tab,
                 &self.item_bag,

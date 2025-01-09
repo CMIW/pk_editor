@@ -4,24 +4,19 @@ Provides utilities to modify save files from Pokémon games such as Ruby, Sapphi
 
 Supports Linux and Windows, it's a work in progress so the program can crash with unexpected behaviour.
 
-## Features 
-•Gen new Pokemon (it's completely *illegal*, always the same PID)
-
-•Edit species  
-
-•Edit moves
-
-•Edit stats
-
-•Edit lvl
-
-•Edit held item
-
-•Edit Pokerus status
-
-•Edit friendship 
-
-•Edit trainer bag
+## Features
+* [x] Gen new Pokemon (it's completely **illegal**, always the same PID)
+* [x] Edit species  
+* [x] Edit moves
+* [x] Edit stats
+* [x] Edit lvl
+* [x] Edit held item
+* [x] Edit Pokerus status
+* [x] Edit friendship
+* [ ] Edit nature
+* [ ] Edit nickname
+* [x] Edit trainer bag
+* [ ] Edit trainer info
 
 ![main](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot01.png)
 ![main](https://github.com/CMIW/pk_editor/blob/main/Screenshots/Screenshot02.png)
