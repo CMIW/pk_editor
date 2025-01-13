@@ -1,3 +1,4 @@
+---
 - name: Rust Cache
   uses: Swatinem/rust-cache@v2.7.7
 - name: Rust Release binary
