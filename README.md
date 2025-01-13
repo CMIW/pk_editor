@@ -5,7 +5,7 @@ Provides utilities to modify save files from Pokémon games such as Ruby, Sapphi
 Supports Linux and Windows, it's a work in progress so the program can crash with unexpected behaviour.
 
 ## Features
-* [x] Gen new Pokemon (it's completely **illegal**, always the same PID)
+* [x] Gen new Pokemon (it's completely **illegal**)
 * [x] Edit species  
 * [x] Edit moves
 * [x] Edit stats
@@ -13,8 +13,10 @@ Supports Linux and Windows, it's a work in progress so the program can crash wit
 * [x] Edit held item
 * [x] Edit Pokerus status
 * [x] Edit friendship
-* [ ] Edit nature
+* [x] Edit nature (buggy)
 * [ ] Edit nickname
+* [ ] Edit gender
+* [ ] Edit ability
 * [x] Edit trainer bag
 * [ ] Edit trainer info
 

@@ -60,7 +60,7 @@ pub fn pc_box<'a>(
             pc_row = pc_row.push(if pokemon.is_empty() {
                 pc_slot(None).on_press(Message::Selected(
                     Some(Id::new(pokemon.offset().to_string())),
-                    Some(StorageType::Party),
+                    Some(StorageType::PC),
                     Some(*pokemon),
                 ))
             } else {

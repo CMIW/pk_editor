@@ -14,7 +14,7 @@ use pk_editor::{bag, icon, party_box};
 
 use pk_edit::data_structure::pokemon::{gen_pokemon_from_species, Pokemon, Pokerus};
 use pk_edit::misc::extract_db;
-use pk_edit::{SaveFile, StorageType};
+use pk_edit::{SaveFile, StorageType, Pocket};
 
 fn main() -> iced::Result {
     if extract_db().is_ok() {};
@@ -146,11 +146,11 @@ impl State {
 
                 self.party = self.save_file.get_party().expect("REASON");
                 self.current_pc = self.save_file.pc_box(self.current_pc_index);
-                self.item_bag = self.save_file.item_pocket().expect("REASON");
-                self.ball_bag = self.save_file.ball_pocket().expect("REASON");
-                self.berry_bag = self.save_file.berry_pocket().expect("REASON");
-                self.tm_bag = self.save_file.tm_pocket().expect("REASON");
-                self.key_bag = self.save_file.key_pocket().expect("REASON");
+                self.item_bag = self.save_file.pocket(Pocket::Items).expect("REASON");
+                self.ball_bag = self.save_file.pocket(Pocket::Pokeballs).expect("REASON");
+                self.berry_bag = self.save_file.pocket(Pocket::Berries).expect("REASON");
+                self.tm_bag = self.save_file.pocket(Pocket::Tms).expect("REASON");
+                self.key_bag = self.save_file.pocket(Pocket::Key).expect("REASON");
 
                 Task::none()
             }
@@ -241,14 +241,22 @@ impl State {
             Message::SpeciesSelected(species) => {
                 if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
                     if selected_pokemon.is_empty() {
-                        *selected_pokemon = gen_pokemon_from_species(
-                            selected_pokemon.offset(),
+                        match gen_pokemon_from_species(
+                            *selected_pokemon,
                             &species,
                             &self.save_file.ot_name(),
                             &self.save_file.ot_id(),
-                        );
+                        ) {
+                            Ok(pokemon) => {
+                                *selected_pokemon = pokemon;
+                                self.update(Message::UpdateChanges)
+                            },
+                            Err(e) => {
+                                println!("{:?}", e);
+                                Task::none()
+                            }
+                        }
 
-                        self.update(Message::UpdateChanges)
                     } else {
                         selected_pokemon.set_species(&species);
                         self.update(Message::UpdateChanges)
@@ -323,16 +331,20 @@ impl State {
                     Task::none()
                 }
             }
-            /*Message::NatureSelected(_nature) => {
-                //self.selected_pokemon.set_nature(&nature);
-                self.update(Message::UpdateChanges)
-            }*/
+            Message::NatureSelected(nature) => {
+                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
+                    selected_pokemon.set_nature(&nature);
+                    self.update(Message::UpdateChanges)
+                } else {
+                    Task::none()
+                }
+            }
             Message::ItemChanged(i, selected) => {
                 self.item_bag[i].0 = selected;
                 if self.item_bag[i].1 == 0 {
                     self.item_bag[i].1 = 1;
                 }
-                self.save_file.save_item_pocket(self.item_bag.clone());
+                self.save_file.save_pocket(Pocket::Items, self.item_bag.clone());
                 self.update(Message::UpdateChanges)
             }
             Message::ItemQuantityChanged(i, mut value) => {
@@ -346,7 +358,7 @@ impl State {
                     } else {
                         self.item_bag[i].1 = number;
                     }
-                    self.save_file.save_item_pocket(self.item_bag.clone());
+                    self.save_file.save_pocket(Pocket::Items, self.item_bag.clone());
                     self.update(Message::UpdateChanges)
                 } else {
                     Task::none()
@@ -359,7 +371,7 @@ impl State {
                 } else if self.ball_bag[i].1 == 0 {
                     self.ball_bag[i].1 = 1;
                 }
-                self.save_file.save_ball_pocket(self.ball_bag.clone());
+                self.save_file.save_pocket(Pocket::Pokeballs, self.ball_bag.clone());
                 self.update(Message::UpdateChanges)
             }
             Message::BallQuantityChanged(i, mut value) => {
@@ -373,7 +385,7 @@ impl State {
                     } else {
                         self.ball_bag[i].1 = number;
                     }
-                    self.save_file.save_ball_pocket(self.ball_bag.clone());
+                    self.save_file.save_pocket(Pocket::Pokeballs, self.ball_bag.clone());
                     self.update(Message::UpdateChanges)
                 } else {
                     Task::none()
@@ -386,7 +398,7 @@ impl State {
                 } else if self.berry_bag[i].1 == 0 {
                     self.berry_bag[i].1 = 1;
                 }
-                self.save_file.save_berry_pocket(self.berry_bag.clone());
+                self.save_file.save_pocket(Pocket::Berries, self.berry_bag.clone());
                 self.update(Message::UpdateChanges)
             }
             Message::BerryQuantityChanged(i, mut value) => {
@@ -400,7 +412,7 @@ impl State {
                     } else {
                         self.berry_bag[i].1 = number;
                     }
-                    self.save_file.save_berry_pocket(self.berry_bag.clone());
+                    self.save_file.save_pocket(Pocket::Berries, self.berry_bag.clone());
                     self.update(Message::UpdateChanges)
                 } else {
                     Task::none()
@@ -413,7 +425,7 @@ impl State {
                 } else if self.tm_bag[i].1 == 0 {
                     self.tm_bag[i].1 = 1;
                 }
-                self.save_file.save_tm_pocket(self.tm_bag.clone());
+                self.save_file.save_pocket(Pocket::Tms, self.tm_bag.clone());
                 self.update(Message::UpdateChanges)
             }
             Message::TmQuantityChanged(i, mut value) => {
@@ -427,7 +439,7 @@ impl State {
                     } else {
                         self.tm_bag[i].1 = number;
                     }
-                    self.save_file.save_tm_pocket(self.tm_bag.clone());
+                    self.save_file.save_pocket(Pocket::Tms, self.tm_bag.clone());
                     self.update(Message::UpdateChanges)
                 } else {
                     Task::none()
@@ -440,7 +452,7 @@ impl State {
                 } else if self.key_bag[i].1 == 0 {
                     self.key_bag[i].1 = 1;
                 }
-                self.save_file.save_key_pocket(self.key_bag.clone());
+                self.save_file.save_pocket(Pocket::Key, self.key_bag.clone());
                 self.update(Message::UpdateChanges)
             }
             _ => Task::none(),
