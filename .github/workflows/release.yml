@@ -9,10 +9,7 @@ jobs:
     runs-on: '${{ matrix.os }}'
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
+        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - target: x86_64-pc-windows-gnu
           - target: x86_64-pc-windows-msvc
