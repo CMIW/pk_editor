@@ -1,3 +1,4 @@
+name: release
 on:
     release:
         types: [created]
@@ -6,7 +7,7 @@ jobs:
         name: release ${{ matrix.target }}
         runs-on: ubuntu-latest
         strategy:
-            fail_fast: false
+            fail-fast: false
             matrix:
                 include:
                     - target: x86_64-pc-windows-gnu
