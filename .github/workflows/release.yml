@@ -8,14 +8,24 @@ jobs:
     name: 'release ${{ matrix.target }}'
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - target: x86_64-pc-windows-gnu
             archive: zip
+          - target: x86_64-pc-windows-msvc
+            archive: zip
           - target: x86_64-unknown-linux-musl
             archive: zip
+          - target: x86_64-unknown-linux-gnu
+            archive: zip
+          - target: aarch64-unknown-linux-gnu
+            archive: zip
+          - target: aarch64-unknown-linux-musl
+            archive: zip
           - target: x86_64-apple-darwin
+            archive: zip
+          - target: aarch64-apple-darwin
             archive: zip
     steps:
       - uses: actions/checkout@master
