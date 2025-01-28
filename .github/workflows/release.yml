@@ -1,9 +1,9 @@
 name: Build and Release Rust Binaries
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types:
+      - created
 
 jobs:
   build:
