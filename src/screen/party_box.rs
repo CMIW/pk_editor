@@ -21,7 +21,7 @@ pub fn party_box<'a>(
 ) -> Element<'a, Message> {
     row![
         column![
-            menu_bar(selected_tab),
+            menu_bar::view(selected_tab).map(|m| Message::MenuBar(m)),
             row![
                 iced::widget::Space::with_width(5.0),
                 party(selected, party_list),
@@ -31,7 +31,7 @@ pub fn party_box<'a>(
         ]
         .spacing(15),
         if let Some(selected_pokemon) = selected_pokemon {
-            pokemon_info(cb_state, &selected_pokemon)
+            pokemon_info(cb_state, &selected_pokemon).map(|m| Message::PokemonInfo(m))
         } else {
             container("").into()
         },

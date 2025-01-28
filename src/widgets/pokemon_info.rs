@@ -1,20 +1,144 @@
 use iced::color;
 use iced::widget::{button, text_input};
-use iced::widget::{column, container, image, mouse_area, combo_box, pick_list, row, text};
+use iced::widget::{column, combo_box, container, image, mouse_area, pick_list, row, text};
 use iced::{Alignment, Element, Length};
 
-use crate::message::Message;
 use crate::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokemon_info_appearance};
 use crate::widgets::input_level;
 
+use pk_edit::data_structure::pokemon::gen_pokemon_from_species;
 use pk_edit::data_structure::pokemon::{Pokemon, Pokerus, Stats};
-use pk_edit::misc::{held_items, item_id, species, NATURE};
+use pk_edit::misc::{held_items, item_id, NATURE};
 
-use crate::{pick_list_default, text_input_default};
 use crate::stat_bar;
 use crate::widgets::gender;
 use crate::widgets::move_slot;
+use crate::{pick_list_default, text_input_default};
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    AddMove(usize),
+    ChangePokerusStatus,
+    NatureSelected(String),
+    SpeciesSelected(String),
+    HeldItemSelected(String),
+    FriendshipChanged(String),
+    LevelInputChanged(String),
+    IVChanged(String, String),
+    EVChanged(String, String),
+    MoveSelected(usize, String),
+}
+
+pub fn update(
+    selected_pokemon: &mut Option<Pokemon>,
+    ot_name: &[u8],
+    ot_id: &[u8],
+    message: Message,
+) {
+    match message {
+        Message::ChangePokerusStatus => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                match selected_pokemon.pokerus_status() {
+                    Pokerus::Infected => {
+                        let _ = selected_pokemon.cure_pokerus();
+                    }
+                    Pokerus::Cured => {
+                        let _ = selected_pokemon.remove_pokerus();
+                    }
+                    Pokerus::None => {
+                        let _ = selected_pokemon.infect_pokerus();
+                    }
+                }
+            }
+        }
+        Message::LevelInputChanged(mut value) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u64>() {
+                    let lowest_level = selected_pokemon.lowest_level();
+                    let value = if number > 100 {
+                        100
+                    } else if number < lowest_level as u64 {
+                        lowest_level
+                    } else {
+                        number as u8
+                    };
+                    selected_pokemon.set_level(value);
+                }
+            }
+        }
+        Message::SpeciesSelected(species) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                if selected_pokemon.is_empty() {
+                    match gen_pokemon_from_species(*selected_pokemon, &species, ot_name, ot_id) {
+                        Ok(pokemon) => {
+                            *selected_pokemon = pokemon;
+                        }
+                        Err(e) => {
+                            println!("{:?}", e);
+                        }
+                    }
+                } else {
+                    selected_pokemon.set_species(&species);
+                }
+            }
+        }
+        Message::IVChanged(iv, mut value) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u16>() {
+                    selected_pokemon.stats_mut().update_ivs(&iv, number);
+                } else if value.is_empty() {
+                    selected_pokemon.stats_mut().update_ivs(&iv, 0);
+                }
+            }
+        }
+        Message::EVChanged(ev, mut value) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u16>() {
+                    selected_pokemon.stats_mut().update_evs(&ev, number);
+                } else if value.is_empty() {
+                    selected_pokemon.stats_mut().update_evs(&ev, 0);
+                }
+            }
+        }
+        Message::FriendshipChanged(mut value) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                value.retain(|c| c.is_numeric());
+                if let Ok(number) = value.parse::<u64>() {
+                    let value = if number > u8::MAX.into() {
+                        u8::MAX
+                    } else {
+                        number as u8
+                    };
+                    selected_pokemon.set_friendship(value);
+                }
+            }
+        }
+        Message::HeldItemSelected(item) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                selected_pokemon.give_item(&item);
+            }
+        }
+        Message::MoveSelected(index, value) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                selected_pokemon.set_move(index, &value);
+            }
+        }
+        Message::AddMove(index) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                selected_pokemon.set_move(index, "Pound");
+            }
+        }
+        Message::NatureSelected(nature) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                selected_pokemon.set_nature(&nature);
+            }
+        }
+    }
+}
 
 fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
     let pokeball = if pokemon.pokeball_caught() == 0 {
@@ -332,14 +456,22 @@ fn info_moves(moves: Vec<(String, String, u8, u8)>) -> Element<'static, Message>
         .into()
 }
 
-pub fn pokemon_info<'a>(state: &'a iced::widget::combo_box::State<String>, pokemon: &Pokemon) -> Element<'a, Message> {
+pub fn pokemon_info<'a>(
+    state: &'a iced::widget::combo_box::State<String>,
+    pokemon: &Pokemon,
+) -> Element<'a, Message> {
     let label = info_label(pokemon);
 
     let dex_species_lang = row![
         text(format!("No. {}", pokemon.nat_dex_number())),
-        combo_box(state, "Select Pokemon species...", Some(&pokemon.species()), Message::SpeciesSelected)
-            .width(130)
-            .input_style(text_input_default),
+        combo_box(
+            state,
+            "Select Pokemon species...",
+            Some(&pokemon.species()),
+            Message::SpeciesSelected
+        )
+        .width(130)
+        .input_style(text_input_default),
         iced::widget::Space::with_width(Length::Fill),
         text(pokemon.language().to_string()),
         iced::widget::Space::with_width(45),

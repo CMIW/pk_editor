@@ -5,16 +5,148 @@ use iced::widget::{column, pick_list, row, scrollable, text, text_input};
 use iced::Length;
 use iced::{Alignment, Element};
 
-use crate::message::Message;
+use crate::message;
 use crate::misc::PROJECT_DIR;
 use crate::pick_list_default;
 use crate::tab_bar_tab;
 
 use pk_edit::misc::{balls, berries, item_id, items, key_items, tms};
+use pk_edit::Pocket;
+use pk_edit::SaveFile;
 
 use crate::menu_bar;
 use crate::menu_bar_default;
 use crate::tab;
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    SelectedBag(Id),
+    ItemChanged(usize, String),
+    ItemQuantityChanged(usize, String),
+    BallChanged(usize, String),
+    BallQuantityChanged(usize, String),
+    BerryChanged(usize, String),
+    BerryQuantityChanged(usize, String),
+    TmChanged(usize, String),
+    TmQuantityChanged(usize, String),
+    KeyChanged(usize, String),
+}
+
+pub fn update(
+    tm_bag: &mut Vec<(String, u16)>,
+    key_bag: &mut Vec<(String, u16)>,
+    item_bag: &mut Vec<(String, u16)>,
+    ball_bag: &mut Vec<(String, u16)>,
+    berry_bag: &mut Vec<(String, u16)>,
+    save_file: &mut SaveFile,
+    selected_bag: &mut Option<Id>,
+    message: Message,
+) {
+    match message {
+        Message::SelectedBag(id) => {
+            selected_bag.replace(id);
+        }
+        Message::ItemChanged(i, selected) => {
+            item_bag[i].0 = selected;
+            if item_bag[i].1 == 0 {
+                item_bag[i].1 = 1;
+            }
+            save_file.save_pocket(Pocket::Items, item_bag.clone());
+        }
+        Message::ItemQuantityChanged(i, mut value) => {
+            value.retain(|c| c.is_numeric());
+            if let Ok(number) = value.parse::<u16>() {
+                if number >= 99 {
+                    item_bag[i].1 = 99;
+                } else if number == 0 {
+                    item_bag[i].1 = 0;
+                    item_bag[i].0 = "Nothing".to_string();
+                } else {
+                    item_bag[i].1 = number;
+                }
+                save_file.save_pocket(Pocket::Items, item_bag.clone());
+            }
+        }
+        Message::BallChanged(i, selected) => {
+            ball_bag[i].0 = selected;
+            if ball_bag[i].0 == "Nothing" {
+                ball_bag[i].1 = 0;
+            } else if ball_bag[i].1 == 0 {
+                ball_bag[i].1 = 1;
+            }
+            save_file.save_pocket(Pocket::Pokeballs, ball_bag.clone());
+        }
+        Message::BallQuantityChanged(i, mut value) => {
+            value.retain(|c| c.is_numeric());
+            if let Ok(number) = value.parse::<u16>() {
+                if number >= 99 {
+                    ball_bag[i].1 = 99;
+                } else if number == 0 {
+                    ball_bag[i].1 = 0;
+                    ball_bag[i].0 = "Nothing".to_string();
+                } else {
+                    ball_bag[i].1 = number;
+                }
+                save_file.save_pocket(Pocket::Pokeballs, ball_bag.clone());
+            }
+        }
+        Message::BerryChanged(i, selected) => {
+            berry_bag[i].0 = selected;
+            if berry_bag[i].0 == "Nothing" {
+                berry_bag[i].1 = 0;
+            } else if berry_bag[i].1 == 0 {
+                berry_bag[i].1 = 1;
+            }
+            save_file.save_pocket(Pocket::Berries, berry_bag.clone());
+        }
+        Message::BerryQuantityChanged(i, mut value) => {
+            value.retain(|c| c.is_numeric());
+            if let Ok(number) = value.parse::<u16>() {
+                if number >= 99 {
+                    berry_bag[i].1 = 99;
+                } else if number == 0 {
+                    berry_bag[i].1 = 0;
+                    berry_bag[i].0 = "Nothing".to_string();
+                } else {
+                    berry_bag[i].1 = number;
+                }
+                save_file.save_pocket(Pocket::Berries, berry_bag.clone());
+            }
+        }
+        Message::TmChanged(i, selected) => {
+            tm_bag[i].0 = selected;
+            if tm_bag[i].0 == "Nothing" {
+                tm_bag[i].1 = 0;
+            } else if tm_bag[i].1 == 0 {
+                tm_bag[i].1 = 1;
+            }
+            save_file.save_pocket(Pocket::Tms, tm_bag.clone());
+        }
+        Message::TmQuantityChanged(i, mut value) => {
+            value.retain(|c| c.is_numeric());
+            if let Ok(number) = value.parse::<u16>() {
+                if number >= 99 {
+                    tm_bag[i].1 = 99;
+                } else if number == 0 {
+                    tm_bag[i].1 = 0;
+                    tm_bag[i].0 = "Nothing".to_string();
+                } else {
+                    tm_bag[i].1 = number;
+                }
+                save_file.save_pocket(Pocket::Tms, tm_bag.clone());
+            }
+        }
+        Message::KeyChanged(i, selected) => {
+            key_bag[i].0 = selected;
+            if key_bag[i].0 == "Nothing" {
+                key_bag[i].1 = 0;
+            } else if key_bag[i].1 == 0 {
+                key_bag[i].1 = 1;
+            }
+            save_file.save_pocket(Pocket::Key, key_bag.clone());
+        }
+    };
+}
 
 pub fn bag<'a>(
     selected_bag: &Option<Id>,
@@ -24,34 +156,34 @@ pub fn bag<'a>(
     berries: &'a [(String, u16)],
     tms: &'a [(String, u16)],
     key_items: &'a [(String, u16)],
-) -> Element<'a, Message> {
+) -> Element<'a, message::Message> {
     column![
-        menu_bar(selected_tab),
+        menu_bar::view(selected_tab).map(|m| message::Message::MenuBar(m)),
         row![
             iced::widget::Space::with_width(Length::Fill),
-            bag_tab_bar(selected_bag),
+            bag_tab_bar(selected_bag).map(|m| message::Message::Bag(m)),
             iced::widget::Space::with_width(Length::Fill)
         ],
         row![
             iced::widget::Space::with_width(Length::Fill),
             if Some(Id::new("1")) == *selected_bag {
-                items_bag(items)
+                items_bag(items).map(|m| message::Message::Bag(m))
             } else if Some(Id::new("2")) == *selected_bag {
-                balls_bag(balls)
+                balls_bag(balls).map(|m| message::Message::Bag(m))
             } else if Some(Id::new("3")) == *selected_bag {
-                berries_bag(berries)
+                berries_bag(berries).map(|m| message::Message::Bag(m))
             } else if Some(Id::new("4")) == *selected_bag {
-                tms_bag(tms)
+                tms_bag(tms).map(|m| message::Message::Bag(m))
             } else if Some(Id::new("5")) == *selected_bag {
-                keys_bag(key_items)
+                keys_bag(key_items).map(|m| message::Message::Bag(m))
             } else {
                 text("").into()
             },
             iced::widget::Space::with_width(Length::Fill),
         ]
-        .spacing(25),
+        .spacing(15),
     ]
-    .spacing(25)
+    .spacing(15)
     .into()
 }
 

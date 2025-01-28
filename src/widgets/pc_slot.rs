@@ -175,7 +175,24 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        let w_style = theme.style(&self.class, self.status.unwrap_or(Status::Idle));
+        let bounds = layout.bounds();
+        let is_mouse_over = cursor.is_over(bounds);
+
+        let status = if self.on_press.is_none() {
+            Status::Idle
+        } else if is_mouse_over {
+            let state = tree.state.downcast_ref::<State>();
+
+            if state.is_pressed {
+                Status::Pressed
+            } else {
+                Status::Hovered
+            }
+        } else {
+            Status::Idle
+        };
+
+        let w_style = theme.style(&self.class, status);
 
         renderer.fill_quad(
             renderer::Quad {
@@ -220,64 +237,66 @@ where
         event: event::Event,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
-        _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
-        _viewport: &Rectangle,
+        viewport: &Rectangle,
     ) -> iced::event::Status {
-        use event::Status::*;
+        if let iced::event::Status::Captured = self.content.as_widget_mut().on_event(
+            &mut tree.children[0],
+            event.clone(),
+            layout.children().next().unwrap(),
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        ) {
+            return iced::event::Status::Captured;
+        }
 
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
-                let bounds = layout.bounds();
-
-                if cursor.is_over(bounds) {
-                    let state = tree.state.downcast_mut::<State>();
-
-                    state.is_pressed = true;
-                }
-
-                Captured
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerLifted { .. }) => {
-                let state = tree.state.downcast_mut::<State>();
-
-                if state.is_pressed {
-                    state.is_pressed = false;
-
+                if self.on_press.is_some() {
                     let bounds = layout.bounds();
 
                     if cursor.is_over(bounds) {
-                        if let Some(on_press) = &self.on_press {
-                            shell.publish(on_press.get());
-                        }
+                        let state = tree.state.downcast_mut::<State>();
+
+                        state.is_pressed = true;
+
+                        return iced::event::Status::Captured;
                     }
                 }
-                Captured
+            }
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerLifted { .. }) => {
+                if let Some(on_press) = self.on_press.as_ref().map(OnPress::get) {
+                    let state = tree.state.downcast_mut::<State>();
+
+                    if state.is_pressed {
+                        state.is_pressed = false;
+
+                        let bounds = layout.bounds();
+
+                        if cursor.is_over(bounds) {
+                            shell.publish(on_press);
+                        }
+
+                        return iced::event::Status::Captured;
+                    }
+                }
             }
             Event::Touch(touch::Event::FingerLost { .. }) => {
                 let state = tree.state.downcast_mut::<State>();
 
                 state.is_pressed = false;
-
-                Captured
             }
-            Event::Mouse(mouse::Event::CursorMoved { .. }) => {
-                let bounds = layout.bounds();
-                if cursor.is_over(bounds) {
-                    self.status = Some(Status::Hovered);
-                } else if self.is_selected {
-                    self.status = Some(Status::Selected);
-                } else {
-                    self.status = Some(Status::Idle);
-                }
-
-                Captured
-            }
-            _ => Ignored,
+            _ => {}
         }
+
+        iced::event::Status::Ignored
     }
 }
 
@@ -297,6 +316,7 @@ where
 pub enum Status {
     Idle,
     Hovered,
+    Pressed,
     Selected,
 }
 
@@ -361,7 +381,7 @@ pub fn default(theme: &Theme, status: Status) -> Style {
     let palette = theme.extended_palette();
 
     match status {
-        Status::Idle => Style { ..Style::default() },
+        Status::Idle | Status::Pressed => Style { ..Style::default() },
         Status::Selected => Style {
             background: Some(Background::Color(palette.primary.strong.color)),
             ..Style::default()

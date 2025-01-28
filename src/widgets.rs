@@ -11,20 +11,19 @@ pub mod tab;
 
 pub use gender::gender;
 pub use level::level;
-pub use menu_bar::menu_bar;
+pub use menu_bar::view;
 pub use party::party;
 pub use party_slot::party_slot;
 pub use pc::pc_box;
 pub use pc_slot::pc_slot;
 pub use pokemon_info::pokemon_info;
 pub use stat_bar::stat_bar;
-pub use tab::*;
+pub use tab::tab;
 
 use iced::widget::Container;
 use iced::widget::{container, image, pick_list, row, text};
 use iced::{Alignment, Element};
 
-use crate::message::Message;
 use crate::misc::{PROJECT_DIR, WINDOW_WIDTH};
 use crate::theme::default_box;
 
@@ -37,7 +36,7 @@ pub fn move_slot(
     move_name: &str,
     pp_used: u8,
     pp_total: u8,
-) -> Element<'static, Message> {
+) -> Element<'static, pokemon_info::Message> {
     let handle = image::Handle::from_bytes(
         PROJECT_DIR
             .get_file(format!("Types/{}_icon_SV.png", move_type))
@@ -59,7 +58,7 @@ pub fn move_slot(
         row![
             move_icon,
             pick_list(moves, Some(move_name.to_string()), move |selection| {
-                Message::MoveSelected(index, selection)
+                pokemon_info::Message::MoveSelected(index, selection)
             })
             .width(160)
             .style(pick_list_default),
@@ -76,7 +75,7 @@ pub fn move_slot(
     .into()
 }
 
-fn pp(pp_used: u8, pp_total: u8) -> Container<'static, Message> {
+fn pp(pp_used: u8, pp_total: u8) -> Container<'static, pokemon_info::Message> {
     container(text(format!("{}/{}", pp_used, pp_total)))
         .width(60)
         .height(30.0)
@@ -121,9 +120,9 @@ fn input_appearance(theme: &iced::Theme, status: Status) -> iced::widget::text_i
     }
 }
 
-pub fn input_level(level: u8) -> Container<'static, Message> {
+pub fn input_level(level: u8) -> Container<'static, pokemon_info::Message> {
     let input = text_input(&level.to_string(), &level.to_string())
-        .on_input(Message::LevelInputChanged)
+        .on_input(pokemon_info::Message::LevelInputChanged)
         .line_height(text::LineHeight::Absolute(14.into()))
         .style(input_appearance)
         .width(35)

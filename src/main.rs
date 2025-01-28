@@ -1,8 +1,8 @@
 #![windows_subsystem = "windows"]
-use iced::widget::container;
-use iced::{Element, Task, Theme};
-
 use iced::advanced::widget::Id;
+use iced::widget::container;
+use iced::widget::opaque;
+use iced::{Element, Task, Theme};
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,7 +14,9 @@ use pk_editor::{bag, icon, party_box};
 
 use pk_edit::data_structure::pokemon::{gen_pokemon_from_species, Pokemon, Pokerus};
 use pk_edit::misc::extract_db;
-use pk_edit::{SaveFile, StorageType, Pocket};
+use pk_edit::{Pocket, SaveFile, StorageType};
+use pk_editor::menu_bar;
+use pk_editor::pokemon_info;
 
 fn main() -> iced::Result {
     if extract_db().is_ok() {};
@@ -30,6 +32,7 @@ fn main() -> iced::Result {
 #[derive(Default, Debug)]
 pub struct State {
     theme: Theme,
+    show_modal: bool,
     save_file: SaveFile,
     party: Vec<Pokemon>,
     selected: Option<Id>,
@@ -75,6 +78,7 @@ impl State {
                 item_bag: vec![],
                 ball_bag: vec![],
                 berry_bag: vec![],
+                show_modal: false,
                 current_pc_index: 0,
                 selected_pokemon: None,
                 theme: iced::Theme::Dracula,
@@ -93,11 +97,55 @@ impl State {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::OpenFile => Task::perform(pick_file(), Message::FileOpened),
-            Message::SaveFile => Task::perform(pick_file(), Message::FileSaved),
+            Message::MenuBar(message) => match message {
+                menu_bar::Message::OpenFile => {
+                    self.show_modal = true;
+                    Task::perform(pick_file(), Message::FileOpened)
+                }
+                menu_bar::Message::SaveFile => {
+                    self.show_modal = true;
+                    Task::perform(save_file(), Message::FileSaved)
+                }
+                menu_bar::Message::SelectedTab(id) => {
+                    self.selected_tab = Some(id);
+
+                    if self.selected_tab == Some(Id::new("1")) {
+                        self.screen = Some(Screen::PartyBoxes);
+                    } else if self.selected_tab == Some(Id::new("2")) {
+                        self.screen = Some(Screen::BagTrainer);
+                    }
+
+                    Task::none()
+                }
+            },
+            Message::Bag(message) => {
+                bag::update(
+                    &mut self.tm_bag,
+                    &mut self.key_bag,
+                    &mut self.item_bag,
+                    &mut self.ball_bag,
+                    &mut self.berry_bag,
+                    &mut self.save_file,
+                    &mut self.selected_bag,
+                    message,
+                );
+                self.update(Message::UpdateChanges)
+            }
+            Message::PokemonInfo(message) => {
+                pokemon_info::update(
+                    &mut self.selected_pokemon,
+                    &self.save_file.ot_name(),
+                    &self.save_file.ot_id(),
+                    message,
+                );
+                self.update(Message::UpdateChanges)
+            }
             Message::FileOpened(Ok(path)) => Task::perform(load_file(path), Message::LoadFile),
             Message::FileOpened(Err(error)) => {
-                self.error = Some(error);
+                match error {
+                    Error::DialogClosed => self.show_modal = false,
+                    _ => self.error = Some(error),
+                }
                 Task::none()
             }
             Message::FileSaved(Ok(path)) => {
@@ -111,10 +159,14 @@ impl State {
                 }
             }
             Message::FileSaved(Err(error)) => {
-                self.error = Some(error);
+                match error {
+                    Error::DialogClosed => self.show_modal = false,
+                    _ => self.error = Some(error),
+                }
                 Task::none()
             }
             Message::LoadFile(Ok(results)) => {
+                self.show_modal = false;
                 self.selected = None;
                 self.tm_bag = vec![];
                 self.key_bag = vec![];
@@ -129,10 +181,11 @@ impl State {
                 self.update(Message::UpdateChanges)
             }
             Message::LoadFile(Err(error)) => {
+                self.show_modal = false;
                 self.error = Some(error);
                 Task::none()
             }
-            Message::WriteFile(Ok(_)) => Task::none(),
+            Message::WriteFile(Ok(_)) => Task::perform(save_success_dialog(), |_| Message::HideModal),
             Message::WriteFile(Err(error)) => {
                 self.error = Some(error);
                 Task::none()
@@ -162,22 +215,6 @@ impl State {
                 self.selected_pokemon = pokemon;
                 Task::none()
             }
-            Message::SelectedTab(id) => {
-                self.selected_tab = Some(id);
-
-                if self.selected_tab == Some(Id::new("1")) {
-                    self.screen = Some(Screen::PartyBoxes);
-                } else if self.selected_tab == Some(Id::new("2")) {
-                    self.screen = Some(Screen::BagTrainer);
-                }
-
-                Task::none()
-            }
-            Message::SelectedBag(id) => {
-                self.selected_bag = Some(id);
-
-                Task::none()
-            }
             Message::Increment => {
                 if !self.save_file.is_pc_empty() {
                     if self.current_pc_index < 13 {
@@ -202,276 +239,17 @@ impl State {
                     Task::none()
                 }
             }
-            Message::ChangePokerusStatus => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    match selected_pokemon.pokerus_status() {
-                        Pokerus::Infected => {
-                            let _ = selected_pokemon.cure_pokerus();
-                        }
-                        Pokerus::Cured => {
-                            let _ = selected_pokemon.remove_pokerus();
-                        }
-                        Pokerus::None => {
-                            let _ = selected_pokemon.infect_pokerus();
-                        }
-                    }
-                }
-
-                self.update(Message::UpdateChanges)
+            Message::Loaded(_) => todo!(), //_ => Task::none(),
+            Message::HideModal => {
+                self.show_modal = false;
+                Task::none()
             }
-            Message::LevelInputChanged(mut value) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u64>() {
-                        let lowest_level = selected_pokemon.lowest_level();
-                        let value = if number > 100 {
-                            100
-                        } else if number < lowest_level as u64 {
-                            lowest_level
-                        } else {
-                            number as u8
-                        };
-                        selected_pokemon.set_level(value);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::SpeciesSelected(species) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    if selected_pokemon.is_empty() {
-                        match gen_pokemon_from_species(
-                            *selected_pokemon,
-                            &species,
-                            &self.save_file.ot_name(),
-                            &self.save_file.ot_id(),
-                        ) {
-                            Ok(pokemon) => {
-                                *selected_pokemon = pokemon;
-                                self.update(Message::UpdateChanges)
-                            },
-                            Err(e) => {
-                                println!("{:?}", e);
-                                Task::none()
-                            }
-                        }
-
-                    } else {
-                        selected_pokemon.set_species(&species);
-                        self.update(Message::UpdateChanges)
-                    }
-                } else {
-                    Task::none()
-                }
-            }
-            Message::IVChanged(iv, mut value) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>() {
-                        selected_pokemon.stats_mut().update_ivs(&iv, number);
-                    } else if value.is_empty() {
-                        selected_pokemon.stats_mut().update_ivs(&iv, 0);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::EVChanged(ev, mut value) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u16>() {
-                        selected_pokemon.stats_mut().update_evs(&ev, number);
-                    } else if value.is_empty() {
-                        selected_pokemon.stats_mut().update_evs(&ev, 0);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::FriendshipChanged(mut value) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    value.retain(|c| c.is_numeric());
-                    if let Ok(number) = value.parse::<u64>() {
-                        let value = if number > u8::MAX.into() {
-                            u8::MAX
-                        } else {
-                            number as u8
-                        };
-                        selected_pokemon.set_friendship(value);
-                    }
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::HeldItemSelected(item) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    selected_pokemon.give_item(&item);
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::MoveSelected(index, value) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    selected_pokemon.set_move(index, &value);
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::AddMove(index) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    selected_pokemon.set_move(index, "Pound");
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::NatureSelected(nature) => {
-                if let Some(selected_pokemon) = self.selected_pokemon.as_mut() {
-                    selected_pokemon.set_nature(&nature);
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::ItemChanged(i, selected) => {
-                self.item_bag[i].0 = selected;
-                if self.item_bag[i].1 == 0 {
-                    self.item_bag[i].1 = 1;
-                }
-                self.save_file.save_pocket(Pocket::Items, self.item_bag.clone());
-                self.update(Message::UpdateChanges)
-            }
-            Message::ItemQuantityChanged(i, mut value) => {
-                value.retain(|c| c.is_numeric());
-                if let Ok(number) = value.parse::<u16>() {
-                    if number >= 99 {
-                        self.item_bag[i].1 = 99;
-                    } else if number == 0 {
-                        self.item_bag[i].1 = 0;
-                        self.item_bag[i].0 = "Nothing".to_string();
-                    } else {
-                        self.item_bag[i].1 = number;
-                    }
-                    self.save_file.save_pocket(Pocket::Items, self.item_bag.clone());
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::BallChanged(i, selected) => {
-                self.ball_bag[i].0 = selected;
-                if self.ball_bag[i].0 == "Nothing" {
-                    self.ball_bag[i].1 = 0;
-                } else if self.ball_bag[i].1 == 0 {
-                    self.ball_bag[i].1 = 1;
-                }
-                self.save_file.save_pocket(Pocket::Pokeballs, self.ball_bag.clone());
-                self.update(Message::UpdateChanges)
-            }
-            Message::BallQuantityChanged(i, mut value) => {
-                value.retain(|c| c.is_numeric());
-                if let Ok(number) = value.parse::<u16>() {
-                    if number >= 99 {
-                        self.ball_bag[i].1 = 99;
-                    } else if number == 0 {
-                        self.ball_bag[i].1 = 0;
-                        self.ball_bag[i].0 = "Nothing".to_string();
-                    } else {
-                        self.ball_bag[i].1 = number;
-                    }
-                    self.save_file.save_pocket(Pocket::Pokeballs, self.ball_bag.clone());
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::BerryChanged(i, selected) => {
-                self.berry_bag[i].0 = selected;
-                if self.berry_bag[i].0 == "Nothing" {
-                    self.berry_bag[i].1 = 0;
-                } else if self.berry_bag[i].1 == 0 {
-                    self.berry_bag[i].1 = 1;
-                }
-                self.save_file.save_pocket(Pocket::Berries, self.berry_bag.clone());
-                self.update(Message::UpdateChanges)
-            }
-            Message::BerryQuantityChanged(i, mut value) => {
-                value.retain(|c| c.is_numeric());
-                if let Ok(number) = value.parse::<u16>() {
-                    if number >= 99 {
-                        self.berry_bag[i].1 = 99;
-                    } else if number == 0 {
-                        self.berry_bag[i].1 = 0;
-                        self.berry_bag[i].0 = "Nothing".to_string();
-                    } else {
-                        self.berry_bag[i].1 = number;
-                    }
-                    self.save_file.save_pocket(Pocket::Berries, self.berry_bag.clone());
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::TmChanged(i, selected) => {
-                self.tm_bag[i].0 = selected;
-                if self.tm_bag[i].0 == "Nothing" {
-                    self.tm_bag[i].1 = 0;
-                } else if self.tm_bag[i].1 == 0 {
-                    self.tm_bag[i].1 = 1;
-                }
-                self.save_file.save_pocket(Pocket::Tms, self.tm_bag.clone());
-                self.update(Message::UpdateChanges)
-            }
-            Message::TmQuantityChanged(i, mut value) => {
-                value.retain(|c| c.is_numeric());
-                if let Ok(number) = value.parse::<u16>() {
-                    if number >= 99 {
-                        self.tm_bag[i].1 = 99;
-                    } else if number == 0 {
-                        self.tm_bag[i].1 = 0;
-                        self.tm_bag[i].0 = "Nothing".to_string();
-                    } else {
-                        self.tm_bag[i].1 = number;
-                    }
-                    self.save_file.save_pocket(Pocket::Tms, self.tm_bag.clone());
-                    self.update(Message::UpdateChanges)
-                } else {
-                    Task::none()
-                }
-            }
-            Message::KeyChanged(i, selected) => {
-                self.key_bag[i].0 = selected;
-                if self.key_bag[i].0 == "Nothing" {
-                    self.key_bag[i].1 = 0;
-                } else if self.key_bag[i].1 == 0 {
-                    self.key_bag[i].1 = 1;
-                }
-                self.save_file.save_pocket(Pocket::Key, self.key_bag.clone());
-                self.update(Message::UpdateChanges)
-            }
-            _ => Task::none(),
+            Message::ShowModal => todo!(),
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
-        use pk_edit::misc::species;
-
-        let species = match species() {
-            Ok(sps) => sps,
-            Err(_) => {
-                vec![String::from("")]
-            }
-        };
-
-        let cb_state = iced::widget::combo_box::State::new(species);
-
-        container(match self.screen {
+        let content = container(match self.screen {
             Some(Screen::PartyBoxes) => party_box(
                 &self.cb_state,
                 &self.selected,
@@ -491,8 +269,35 @@ impl State {
                 &self.key_bag,
             ),
             _ => container("").into(),
-        })
-        .into()
+        });
+
+        if self.show_modal {
+            iced::widget::stack![
+                content,
+                opaque(
+                    container("")
+                        .width(WINDOW_WIDTH + 50.0)
+                        .height(WINDOW_HEIGHT)
+                        .style(|_theme| {
+                            container::Style {
+                                background: Some(
+                                    iced::Color {
+                                        a: 0.8,
+                                        ..iced::Color::BLACK
+                                    }
+                                    .into(),
+                                ),
+                                ..container::Style::default()
+                            }
+                        })
+                )
+            ]
+            .width(WINDOW_WIDTH + 50.0)
+            .height(WINDOW_HEIGHT)
+            .into()
+        } else {
+            content.into()
+        }
     }
 
     fn theme(&self) -> Theme {
@@ -500,11 +305,32 @@ impl State {
     }
 }
 
+async fn save_success_dialog() {
+    rfd::AsyncMessageDialog::new()
+        .set_title("Saved")
+        .set_level(rfd::MessageLevel::Info)
+        .set_description("Backup succesful!")
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show()
+        .await;
+}
+
 async fn pick_file() -> Result<PathBuf, Error> {
     let handle = rfd::AsyncFileDialog::new()
         .set_title("Choose a file...")
         .add_filter("Save File", &["sav"])
         .pick_file()
+        .await
+        .ok_or(Error::DialogClosed)?;
+
+    Ok(handle.path().to_owned())
+}
+
+async fn save_file() -> Result<PathBuf, Error> {
+    let handle = rfd::AsyncFileDialog::new()
+        .set_title("Choose a file...")
+        .add_filter("Save File", &["sav"])
+        .save_file()
         .await
         .ok_or(Error::DialogClosed)?;
 

@@ -3104,6 +3104,7 @@ dependencies = [
 [[package]]
 name = "pk_edit"
 version = "0.1.0"
+source = "git+https://github.com/CMIW/pk_edit.git#c3ef5878a349acf22d6f737ac010509aed96b0e9"
 dependencies = [
  "anyhow",
  "byteorder",

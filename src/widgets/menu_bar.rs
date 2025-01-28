@@ -12,9 +12,15 @@ use crate::misc::PROJECT_DIR;
 use crate::tab;
 use crate::tab_bar_button_primary;
 use crate::tab_bar_tab;
-use crate::Message;
 
-pub fn menu_bar<'a>(selected_tab: &Option<Id>) -> Element<'a, Message> {
+#[derive(Debug, Clone)]
+pub enum Message {
+    OpenFile,
+    SaveFile,
+    SelectedTab(Id),
+}
+
+pub fn view<'a>(selected_tab: &Option<Id>) -> Element<'a, Message> {
     container(row![
         button(icon::open().center())
             .on_press(Message::OpenFile)

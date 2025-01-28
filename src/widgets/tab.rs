@@ -238,7 +238,7 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) -> iced::event::Status {
-        self.content.as_widget_mut().on_event(
+        if let iced::event::Status::Captured = self.content.as_widget_mut().on_event(
             &mut tree.children[0],
             event.clone(),
             layout.children().next().unwrap(),
@@ -247,7 +247,9 @@ where
             clipboard,
             shell,
             viewport,
-        );
+        ) {
+            return iced::event::Status::Captured;
+        }
 
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
@@ -259,12 +261,14 @@ where
                         let state = tree.state.downcast_mut::<State>();
 
                         state.is_pressed = true;
+
+                        return iced::event::Status::Captured;
                     }
                 }
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerLifted { .. }) => {
-                if let Some(on_press) = &self.on_press {
+                if let Some(on_press) = self.on_press.as_ref().map(OnPress::get) {
                     let state = tree.state.downcast_mut::<State>();
 
                     if state.is_pressed {
@@ -273,8 +277,10 @@ where
                         let bounds = layout.bounds();
 
                         if cursor.is_over(bounds) {
-                            shell.publish(on_press.get());
+                            shell.publish(on_press);
                         }
+
+                        return iced::event::Status::Captured;
                     }
                 }
             }
@@ -286,29 +292,7 @@ where
             _ => {}
         }
 
-        let current_status = if self.on_press.is_none() {
-            Status::Disabled
-        } else if cursor.is_over(layout.bounds()) {
-            let state = tree.state.downcast_ref::<State>();
-
-            if state.is_pressed {
-                Status::Pressed
-            } else {
-                Status::Hovered
-            }
-        } else if self.is_selected {
-            Status::Selected
-        } else {
-            Status::Active
-        };
-
-        if let Event::Window(iced::window::Event::RedrawRequested(_now)) = event {
-            self.status = Some(current_status);
-        } else if self.status.is_some_and(|status| status != current_status) {
-            shell.request_redraw(iced::window::RedrawRequest::NextFrame);
-        }
-
-        iced::event::Status::Captured
+        iced::event::Status::Ignored
     }
 
     fn draw(
@@ -323,7 +307,25 @@ where
     ) {
         let bounds = layout.bounds();
         let content_layout = layout.children().next().unwrap();
-        let style = theme.style(&self.class, self.status.unwrap_or(Status::Disabled));
+        let is_mouse_over = cursor.is_over(bounds);
+
+        let status = if self.on_press.is_none() {
+            Status::Disabled
+        } else if is_mouse_over {
+            let state = tree.state.downcast_ref::<State>();
+
+            if state.is_pressed {
+                Status::Pressed
+            } else {
+                Status::Hovered
+            }
+        } else if self.is_selected {
+            Status::Selected
+        } else {
+            Status::Active
+        };
+
+        let style = theme.style(&self.class, status);
 
         if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0 {
             renderer.fill_quad(

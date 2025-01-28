@@ -6,43 +6,25 @@ use std::sync::Arc;
 use pk_edit::data_structure::pokemon::Pokemon;
 use pk_edit::StorageType;
 
+use crate::bag;
 use crate::error::Error;
+use crate::menu_bar;
+use crate::pokemon_info;
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    BagView,
-    OpenFile,
-    SaveFile,
     Increment,
     Decrement,
-    PokemonView,
+    HideModal,
+    ShowModal,
     UpdateChanges,
-    AddMove(usize),
-    SelectedTab(Id),
-    SelectedBag(Id),
-    ChangePokerusStatus,
-    NatureSelected(String),
-    SpeciesSelected(String),
-    TmChanged(usize, String),
-    HeldItemSelected(String),
-    FriendshipChanged(String),
-    LevelInputChanged(String),
-    IVChanged(String, String),
-    EVChanged(String, String),
-    KeyChanged(usize, String),
+    Bag(bag::Message),
+    MenuBar(menu_bar::Message),
+    PokemonInfo(pokemon_info::Message),
     Loaded(Result<(), String>),
-    BallChanged(usize, String),
-    ItemChanged(usize, String),
-    MoveSelected(usize, String),
-    BerryChanged(usize, String),
     WriteFile(Result<(), Error>),
-    TmQuantityChanged(usize, String),
     FileSaved(Result<PathBuf, Error>),
     FileOpened(Result<PathBuf, Error>),
-    ItemQuantityChanged(usize, String),
-    BallQuantityChanged(usize, String),
-    BerryQuantityChanged(usize, String),
     LoadFile(Result<Arc<Vec<u8>>, Error>),
-    SelectedPokemon((StorageType, Pokemon)),
     Selected(Option<Id>, Option<StorageType>, Option<Pokemon>),
 }

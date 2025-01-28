@@ -3,7 +3,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
-    #[error("File select dialog closed")]
+    #[error("File dialog closed")]
     DialogClosed,
     #[error("IO Error")]
     IO(io::ErrorKind),
