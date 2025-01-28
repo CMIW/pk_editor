@@ -20,9 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Compile and release
-        uses: orium/rust-build.action@fix-linux-ld
+        uses: rust-build/rust-build.action@v1.4.5
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
           RUSTTARGET: '${{ matrix.target }}'
           ARCHIVE_TYPES: '${{ matrix.archive }}'
+          TOOLCHAIN_VERSION: 1.83.0
