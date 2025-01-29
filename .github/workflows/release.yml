@@ -62,10 +62,8 @@ jobs:
           zip ${{ matrix.target }}.zip pk_editor
           ls
       - name: Upload release binaries
-        run: |
-          ls
         uses: xresloader/upload-to-github-release@v1
         with:
-          file: '${{ matrix.target }}.zip'
+          file: "*/${{ matrix.target }}.zip"
           update_latest_release: true
           token: '${{ secrets.GITHUB_TOKEN }}'
