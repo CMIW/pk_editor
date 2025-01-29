@@ -34,7 +34,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt-get update
-          sudo apt install -y cmake pkg-config libssl-dev make
+          sudo apt install -y cmake pkg-config libssl-dev
           echo "OPENSSL_DIR=/usr" >> $GITHUB_ENV
           echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
 
@@ -60,6 +60,7 @@ jobs:
 
       - name: Build
         env:
+          OPENSSL_STATIC: "1"
           OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
           PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
         run: cargo build --release --target ${{ matrix.target }}
