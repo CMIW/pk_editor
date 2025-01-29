@@ -56,10 +56,7 @@ jobs:
 
       - name: Build
         env:
-          OPENSSL_STATIC: "1"
-          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
-          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release
 
       - name: Prepare artifact
         run: |
