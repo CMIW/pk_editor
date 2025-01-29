@@ -54,16 +54,13 @@ jobs:
         if: '${{ matrix.os == ''windows-latest'' }}'
         run: |
           cd target/release
+          tar.exe -a -c -f ${{ matrix.target }}.zip pk_editor.exe
       - name: Prepare artifact
         if: '${{ matrix.os != ''windows-latest'' }}'
         run: |
-          cd target/release ls
-      - name: Zip File
-        if: '${{ matrix.os == ''windows-latest'' }}'
-        run: tar.exe -a -c -f ${{ matrix.target }}.zip pk_editor.exe
-      - name: Zip File
-        if: '${{ matrix.os != ''windows-latest'' }}'
-        run: zip ${{ matrix.target }}.zip pk_editor
+          cd target/release
+          ls
+          zip ${{ matrix.target }}.zip pk_editor
       - name: Upload release binaries
         uses: echapmanFromBunnings/upload-release-assets@1.3
         with:
