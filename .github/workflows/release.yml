@@ -1,14 +1,12 @@
 name: Build and Release Rust Binaries
-
 on:
   release:
     types:
       - created
-
 jobs:
   build:
     name: Build and Upload Binaries
-    runs-on: ${{ matrix.os }}
+    runs-on: '${{ matrix.os }}'
     strategy:
       matrix:
         include:
@@ -18,68 +16,62 @@ jobs:
             target: x86_64-pc-windows-msvc
           - os: macos-latest
             target: x86_64-apple-darwin
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-
       - name: Install OpenSSL on Ubuntu
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+        if: '${{ matrix.os == ''ubuntu-latest'' }}'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake
           sudo apt-get install -y pkg-config
           sudo apt-get install -y libssl-dev
           sudo apt-get install -y openssl
-
       - name: Install dependencies on macOS
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
+        if: '${{ matrix.os == ''macos-latest'' }}'
+        run: >
           brew update
-          brew install openssl cmake
-          sudo xcode-select --install || echo "Xcode Command Line Tools already installed"
 
+          brew install openssl cmake
+
+          sudo xcode-select --install || echo "Xcode Command Line Tools already
+          installed"
       - name: Install OpenSSL on Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: '${{ matrix.os == ''windows-latest'' }}'
         run: |
           choco install openssl
-
       - name: Install target
-        run: rustup target add ${{ matrix.target }}
-
+        run: 'rustup target add ${{ matrix.target }}'
       - name: Build
         run: cargo build --release
-
       - name: Prepare artifact
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: '${{ matrix.os == ''windows-latest'' }}'
         run: |
-          mkdir -p dist
-          mv target/release/*.exe dist/
-
+          cd target/release
       - name: Prepare artifact
-        if: ${{ matrix.os != 'windows-latest' }}
+        if: '${{ matrix.os != ''windows-latest'' }}'
         run: |
-          mkdir -p dist
-          mv target/release/* dist/
-
-  release:
-    name: Create Release
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v1
+          cd target/release
+          zip -j "dist/$(basename "$file" .exe).zip" "$file"
+      - name: Zip File
+        if: '${{ matrix.os == ''windows-latest'' }}'
+        uses: montudor/action-zip@v1
         with:
-          files: dist/*
-          token: ${{ secrets.GITHUB_TOKEN }}
+          args: 'zip -qq -r ${{ matrix.target }}.zip pk_editor.exe'
+      - name: Zip File
+        if: '${{ matrix.os != ''windows-latest'' }}'
+        uses: montudor/action-zip@v1
+        with:
+          args: 'zip -qq -r ${{ matrix.target }}.zip pk_editor'
+      - name: Upload release binaries
+        uses: echapmanFromBunnings/upload-release-assets@1.3
+        with:
+          releaseTag: '${{ steps.previoustag.outputs.tag }}'
+          githubToken: '${{ secrets.GITHUB_TOKEN }}'
+          artefactName: '${{ matrix.target }}.zip'
