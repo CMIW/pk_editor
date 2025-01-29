@@ -59,11 +59,10 @@ jobs:
         if: '${{ matrix.os != ''windows-latest'' }}'
         run: |
           cd target/release
-          ls
           zip ${{ matrix.target }}.zip pk_editor
       - name: Upload release binaries
-        uses: echapmanFromBunnings/upload-release-assets@1.3
+        uses: xresloader/upload-to-github-release@v1
         with:
-          releaseTag: '${{ steps.previoustag.outputs.tag }}'
-          githubToken: '${{ secrets.GITHUB_TOKEN }}'
-          artefactName: '${{ matrix.target }}.zip'
+          file: '${{ matrix.target }}.zip'
+          update_latest_release: true
+          token: '${{ secrets.GITHUB_TOKEN }}'
