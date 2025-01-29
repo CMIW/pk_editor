@@ -63,7 +63,8 @@ jobs:
           ls
       - name: Upload release binaries
         uses: xresloader/upload-to-github-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          file: "*/${{ matrix.target }}.zip"
+          file: "*.zip"
           update_latest_release: true
-          token: '${{ secrets.GITHUB_TOKEN }}'
