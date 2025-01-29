@@ -60,6 +60,7 @@ jobs:
         run: |
           cd target/release
           zip ${{ matrix.target }}.zip pk_editor
+          ls
       - name: Upload release binaries
         uses: xresloader/upload-to-github-release@v1
         with:
