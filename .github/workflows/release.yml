@@ -61,9 +61,9 @@ jobs:
         run: |
           mkdir -p dist
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            mv target/${{ matrix.target }}/release/*.exe dist/
+            mv target/release/*.exe dist/
           else
-            mv target/${{ matrix.target }}/release/* dist/
+            mv target/release/* dist/
           fi
 
   release:
