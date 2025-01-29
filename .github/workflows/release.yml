@@ -58,7 +58,6 @@ jobs:
         if: '${{ matrix.os != ''windows-latest'' }}'
         run: |
           cd target/release
-          zip -j "dist/$(basename "$file" .exe).zip" "$file"
       - name: Zip File
         if: '${{ matrix.os == ''windows-latest'' }}'
         uses: montudor/action-zip@v1
