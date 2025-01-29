@@ -14,8 +14,8 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-          #- os: macos-latest
-            #target: x86_64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -57,7 +57,7 @@ jobs:
       - name: Prepare artifact
         if: '${{ matrix.os != ''windows-latest'' }}'
         run: |
-          cd target/release
+          cd target/release ls
       - name: Zip File
         if: '${{ matrix.os == ''windows-latest'' }}'
         run: tar.exe -a -c -f ${{ matrix.target }}.zip pk_editor.exe
