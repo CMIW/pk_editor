@@ -64,6 +64,6 @@ jobs:
       - name: Upload release binaries
         uses: AButler/upload-release-assets@v3.0
         with:
-          files: "${{ matrix.target }}.zip"
+          files: "target/release/${{ matrix.target }}.zip"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           release-tag: ${{ github.ref_name }}
