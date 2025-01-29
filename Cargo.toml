@@ -12,7 +12,6 @@ rfd = "0.14.1"
 thiserror = "2.0.9"
 include_dir = "0.7.3"
 pk_edit = { git = "https://github.com/CMIW/pk_edit.git"}
-openssl = { version = "0", features = ["vendored"] }
 #pk_edit = { path = "../pk_edit"}
 
 [build-dependencies]
