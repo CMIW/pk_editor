@@ -74,7 +74,7 @@ where
             vec![self
                 .content
                 .as_widget()
-                .layout(&mut tree.children[0], renderer, &limits)
+                .layout(&mut tree.children[0], renderer, limits)
                 .align(iced::Alignment::Center, iced::Alignment::Center, size)],
         )
     }

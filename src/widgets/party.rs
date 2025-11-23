@@ -6,7 +6,8 @@ use crate::message::Message;
 use crate::misc::PROJECT_DIR;
 use crate::widgets::party_slot;
 
-use pk_edit::{Pokemon, StorageType};
+use pk_edit::save::storage::StorageType;
+use pk_edit::Pokemon;
 
 pub fn party_label<'a>() -> Element<'a, Message> {
     let handle = iced::widget::svg::Handle::from_memory(
@@ -75,17 +76,17 @@ pub fn party<'a>(selected: &Option<Id>, party: &[Pokemon]) -> Element<'a, Messag
     for pokemon in party {
         if pokemon.is_empty() {
             col = col.push(party_slot(None).on_press(Message::Selected(
-                Some(Id::new(pokemon.offset().to_string())),
+                Some(Id::new(pokemon.offset.to_string())),
                 Some(StorageType::Party),
                 Some(*pokemon),
             )));
         } else {
             col = col.push(
-                party_slot(Some(&pokemon))
-                    .id(Id::new(pokemon.offset().to_string()))
+                party_slot(Some(pokemon))
+                    .id(Id::new(pokemon.offset.to_string()))
                     .selected(selected)
                     .on_press(Message::Selected(
-                        Some(Id::new(pokemon.offset().to_string())),
+                        Some(Id::new(pokemon.offset.to_string())),
                         Some(StorageType::Party),
                         Some(*pokemon),
                     )),

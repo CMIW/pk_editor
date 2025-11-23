@@ -189,17 +189,17 @@ where
         let mut level = self
             .level
             .as_widget()
-            .layout(&mut tree.children[1], renderer, &limits);
+            .layout(&mut tree.children[1], renderer, limits);
 
         let mut name = self
             .name
             .as_widget()
-            .layout(&mut tree.children[2], renderer, &limits);
+            .layout(&mut tree.children[2], renderer, limits);
 
         let mut gender = self
             .gender
             .as_widget()
-            .layout(&mut tree.children[3], renderer, &limits);
+            .layout(&mut tree.children[3], renderer, limits);
 
         image = image.align(iced::Alignment::End, iced::Alignment::Center, size);
 

@@ -3,8 +3,8 @@ use iced::advanced::widget::Id;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use pk_edit::data_structure::pokemon::Pokemon;
-use pk_edit::StorageType;
+use pk_edit::pokemon::Pokemon;
+use pk_edit::save::storage::StorageType;
 
 use crate::bag;
 use crate::error::Error;

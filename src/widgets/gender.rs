@@ -7,7 +7,7 @@ use iced::widget::text;
 use iced::{color, mouse};
 use iced::{Background, Color, Element, Length, Rectangle, Shadow, Size, Theme};
 
-use pk_edit::data_structure::pokemon;
+use pk_edit::pokemon;
 
 pub fn gender<'a, Message: 'a, Theme, Renderer>(
     gender: pokemon::Gender,
@@ -87,7 +87,7 @@ where
             vec![self
                 .content
                 .as_widget()
-                .layout(&mut tree.children[0], renderer, &limits)
+                .layout(&mut tree.children[0], renderer, limits)
                 .align(iced::Alignment::Center, iced::Alignment::Center, size)],
         )
     }

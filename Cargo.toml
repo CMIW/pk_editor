@@ -11,8 +11,8 @@ tokio = { version = "1.37.0", features = ["fs"] }
 rfd = "0.14.1"
 thiserror = "2.0.9"
 include_dir = "0.7.3"
-pk_edit = { git = "https://github.com/CMIW/pk_edit.git"}
-#pk_edit = { path = "../pk_edit"}
+#pk_edit = { git = "https://github.com/CMIW/pk_edit.git"}
+pk_edit = { path = "../pk_edit"}
 
 [build-dependencies]
 iced_fontello = "0.13"

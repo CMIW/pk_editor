@@ -7,9 +7,10 @@ use crate::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokemon_info_appearance};
 use crate::widgets::input_level;
 
-use pk_edit::data_structure::pokemon::gen_pokemon_from_species;
-use pk_edit::data_structure::pokemon::{Pokemon, Pokerus, Stats};
 use pk_edit::misc::{held_items, item_id, NATURE};
+use pk_edit::pokemon::gen_pokemon_from_species;
+use pk_edit::pokemon::{Pokerus, Stats};
+use pk_edit::Pokemon;
 
 use crate::stat_bar;
 use crate::widgets::gender;
@@ -41,13 +42,13 @@ pub fn update(
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 match selected_pokemon.pokerus_status() {
                     Pokerus::Infected => {
-                        let _ = selected_pokemon.cure_pokerus();
+                        selected_pokemon.cure_pokerus();
                     }
                     Pokerus::Cured => {
-                        let _ = selected_pokemon.remove_pokerus();
+                        selected_pokemon.remove_pokerus();
                     }
                     Pokerus::None => {
-                        let _ = selected_pokemon.infect_pokerus();
+                        selected_pokemon.infect_pokerus();
                     }
                 }
             }
@@ -119,7 +120,7 @@ pub fn update(
         }
         Message::HeldItemSelected(item) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
-                selected_pokemon.give_item(&item);
+                selected_pokemon.set_item(&item);
             }
         }
         Message::MoveSelected(index, value) => {
@@ -502,7 +503,7 @@ pub fn pokemon_info<'a>(
         row![
             text("PID").color(color!(0xffcc00)),
             iced::widget::Space::with_width(30),
-            text(format!("{:X}", pokemon.personality_value()))
+            text(format!("{:X}", pokemon.personality_value))
         ]
         .width((WINDOW_WIDTH * 0.33) / 2.0)
         .align_y(Alignment::Center),
@@ -556,10 +557,7 @@ pub fn pokemon_info<'a>(
     .padding([5, 15])
     .style(pokemon_info_appearance);
 
-    let item_id = match item_id(&pokemon.held_item()) {
-        Ok(id) => id,
-        Err(_) => 0,
-    };
+    let item_id = item_id(&pokemon.item()).unwrap_or_default();
 
     let item_image = if let Some(item_image) =
         PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
@@ -583,13 +581,9 @@ pub fn pokemon_info<'a>(
             iced::widget::Space::with_width(5),
             item_image,
             iced::widget::Space::with_width(5),
-            pick_list(
-                held_items,
-                Some(pokemon.held_item()),
-                Message::HeldItemSelected
-            )
-            .width(150)
-            .style(pick_list_default),
+            pick_list(held_items, Some(pokemon.item()), Message::HeldItemSelected)
+                .width(150)
+                .style(pick_list_default),
             iced::widget::Space::with_width(Length::Fill),
         ]
         .align_y(Alignment::Center),
@@ -607,7 +601,7 @@ pub fn pokemon_info<'a>(
         dex_species_lang,
         pokemon_info_typing(pokemon.typing()),
         iced::widget::Space::with_height(10),
-        stats(pokemon.stats(), pokemon.level()),
+        stats(pokemon.stats, pokemon.level()),
         iced::widget::Space::with_height(10),
         ot,
         pid_friendship,

@@ -11,7 +11,7 @@ use crate::pick_list_default;
 use crate::tab_bar_tab;
 
 use pk_edit::misc::{balls, berries, item_id, items, key_items, tms};
-use pk_edit::Pocket;
+use pk_edit::save::storage::Pocket;
 use pk_edit::SaveFile;
 
 use crate::menu_bar;
@@ -33,7 +33,7 @@ pub enum Message {
 }
 
 pub fn update(
-    tm_bag: &mut Vec<(String, u16)>,
+    tm_bag: &mut [(String, u16)],
     key_bag: &mut Vec<(String, u16)>,
     item_bag: &mut Vec<(String, u16)>,
     ball_bag: &mut Vec<(String, u16)>,
@@ -120,7 +120,7 @@ pub fn update(
             } else if tm_bag[i].1 == 0 {
                 tm_bag[i].1 = 1;
             }
-            save_file.save_pocket(Pocket::Tms, tm_bag.clone());
+            save_file.save_pocket(Pocket::Tms, tm_bag.to_owned());
         }
         Message::TmQuantityChanged(i, mut value) => {
             value.retain(|c| c.is_numeric());
@@ -133,7 +133,7 @@ pub fn update(
                 } else {
                     tm_bag[i].1 = number;
                 }
-                save_file.save_pocket(Pocket::Tms, tm_bag.clone());
+                save_file.save_pocket(Pocket::Tms, tm_bag.to_owned());
             }
         }
         Message::KeyChanged(i, selected) => {
@@ -158,24 +158,24 @@ pub fn bag<'a>(
     key_items: &'a [(String, u16)],
 ) -> Element<'a, message::Message> {
     column![
-        menu_bar::view(selected_tab).map(|m| message::Message::MenuBar(m)),
+        menu_bar::view(selected_tab).map(message::Message::MenuBar),
         row![
             iced::widget::Space::with_width(Length::Fill),
-            bag_tab_bar(selected_bag).map(|m| message::Message::Bag(m)),
+            bag_tab_bar(selected_bag).map(message::Message::Bag),
             iced::widget::Space::with_width(Length::Fill)
         ],
         row![
             iced::widget::Space::with_width(Length::Fill),
             if Some(Id::new("1")) == *selected_bag {
-                items_bag(items).map(|m| message::Message::Bag(m))
+                items_bag(items).map(message::Message::Bag)
             } else if Some(Id::new("2")) == *selected_bag {
-                balls_bag(balls).map(|m| message::Message::Bag(m))
+                balls_bag(balls).map(message::Message::Bag)
             } else if Some(Id::new("3")) == *selected_bag {
-                berries_bag(berries).map(|m| message::Message::Bag(m))
+                berries_bag(berries).map(message::Message::Bag)
             } else if Some(Id::new("4")) == *selected_bag {
-                tms_bag(tms).map(|m| message::Message::Bag(m))
+                tms_bag(tms).map(message::Message::Bag)
             } else if Some(Id::new("5")) == *selected_bag {
-                keys_bag(key_items).map(|m| message::Message::Bag(m))
+                keys_bag(key_items).map(message::Message::Bag)
             } else {
                 text("").into()
             },
@@ -280,11 +280,8 @@ fn items_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
         }
     };
 
-    for (i, (item, quantity)) in bag.into_iter().enumerate() {
-        let item_id = match item_id(&item) {
-            Ok(id) => id,
-            Err(_) => 0,
-        };
+    for (i, (item, quantity)) in bag.iter().enumerate() {
+        let item_id = item_id(item).unwrap_or_default();
 
         let item_image = if let Some(item_image) =
             PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
@@ -328,11 +325,8 @@ fn balls_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
         }
     };
 
-    for (i, (item, quantity)) in bag.into_iter().enumerate() {
-        let item_id = match item_id(&item) {
-            Ok(id) => id,
-            Err(_) => 0,
-        };
+    for (i, (item, quantity)) in bag.iter().enumerate() {
+        let item_id = item_id(item).unwrap_or_default();
 
         let item_image = if let Some(item_image) =
             PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
@@ -376,11 +370,8 @@ fn berries_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
         }
     };
 
-    for (i, (item, quantity)) in bag.into_iter().enumerate() {
-        let item_id = match item_id(&item) {
-            Ok(id) => id,
-            Err(_) => 0,
-        };
+    for (i, (item, quantity)) in bag.iter().enumerate() {
+        let item_id = item_id(item).unwrap_or_default();
 
         let item_image = if let Some(item_image) =
             PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
@@ -424,11 +415,8 @@ fn tms_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
         }
     };
 
-    for (i, (item, quantity)) in bag.into_iter().enumerate() {
-        let item_id = match item_id(&item) {
-            Ok(id) => id,
-            Err(_) => 0,
-        };
+    for (i, (item, quantity)) in bag.iter().enumerate() {
+        let item_id = item_id(item).unwrap_or_default();
 
         let item_image = if let Some(item_image) =
             PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
@@ -472,11 +460,8 @@ fn keys_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
         }
     };
 
-    for (i, (item, _)) in bag.into_iter().enumerate() {
-        let item_id = match item_id(&item) {
-            Ok(id) => id,
-            Err(_) => 0,
-        };
+    for (i, (item, _)) in bag.iter().enumerate() {
+        let item_id = item_id(item).unwrap_or_default();
 
         let item_image = if let Some(item_image) =
             PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))

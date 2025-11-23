@@ -8,7 +8,8 @@ use crate::Message;
 use crate::{icon, pc_slot};
 use crate::{shadow_box, tab_bar_button_primary};
 
-use pk_edit::{Pokemon, StorageType};
+use pk_edit::save::storage::StorageType;
+use pk_edit::Pokemon;
 
 pub fn pc_label<'a>(pc_i: usize) -> Element<'a, Message> {
     row![
@@ -59,16 +60,16 @@ pub fn pc_box<'a>(
         for pokemon in row {
             pc_row = pc_row.push(if pokemon.is_empty() {
                 pc_slot(None).on_press(Message::Selected(
-                    Some(Id::new(pokemon.offset().to_string())),
+                    Some(Id::new(pokemon.offset.to_string())),
                     Some(StorageType::PC),
                     Some(*pokemon),
                 ))
             } else {
                 pc_slot(Some(pokemon.nat_dex_number()))
-                    .id(Id::new(pokemon.offset().to_string()))
+                    .id(Id::new(pokemon.offset.to_string()))
                     .selected(selected)
                     .on_press(Message::Selected(
-                        Some(Id::new(pokemon.offset().to_string())),
+                        Some(Id::new(pokemon.offset.to_string())),
                         Some(StorageType::PC),
                         Some(*pokemon),
                     ))

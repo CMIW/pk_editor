@@ -12,9 +12,11 @@ use pk_editor::message::Message;
 use pk_editor::misc::{WINDOW_HEIGHT, WINDOW_WIDTH};
 use pk_editor::{bag, icon, party_box};
 
-use pk_edit::data_structure::pokemon::{gen_pokemon_from_species, Pokemon, Pokerus};
 use pk_edit::misc::extract_db;
-use pk_edit::{Pocket, SaveFile, StorageType};
+use pk_edit::pokemon::Pokemon;
+use pk_edit::save::storage::Pocket;
+use pk_edit::save::storage::StorageType;
+use pk_edit::SaveFile;
 use pk_editor::menu_bar;
 use pk_editor::pokemon_info;
 
@@ -185,7 +187,9 @@ impl State {
                 self.error = Some(error);
                 Task::none()
             }
-            Message::WriteFile(Ok(_)) => Task::perform(save_success_dialog(), |_| Message::HideModal),
+            Message::WriteFile(Ok(_)) => {
+                Task::perform(save_success_dialog(), |_| Message::HideModal)
+            }
             Message::WriteFile(Err(error)) => {
                 self.error = Some(error);
                 Task::none()
@@ -198,7 +202,10 @@ impl State {
                 }
 
                 self.party = self.save_file.get_party().expect("REASON");
-                self.current_pc = self.save_file.pc_box(self.current_pc_index);
+                self.current_pc = self
+                    .save_file
+                    .pc_box(self.current_pc_index)
+                    .expect("REASON");
                 self.item_bag = self.save_file.pocket(Pocket::Items).expect("REASON");
                 self.ball_bag = self.save_file.pocket(Pocket::Pokeballs).expect("REASON");
                 self.berry_bag = self.save_file.pocket(Pocket::Berries).expect("REASON");
