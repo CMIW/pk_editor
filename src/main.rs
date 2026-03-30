@@ -1,15 +1,23 @@
 #![windows_subsystem = "windows"]
 use iced::advanced::widget::Id;
+use iced::event;
+use iced::mouse;
 use iced::widget::container;
+use iced::widget::image;
 use iced::widget::opaque;
+use iced::Subscription;
+use iced::Vector;
 use iced::{Element, Task, Theme};
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tracing_subscriber;
 
 use pk_editor::error::Error;
 use pk_editor::message::Message;
-use pk_editor::misc::{WINDOW_HEIGHT, WINDOW_WIDTH};
+use pk_editor::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
+use pk_editor::DragState;
 use pk_editor::{bag, icon, party_box};
 
 use pk_edit::misc::extract_db;
@@ -21,20 +29,27 @@ use pk_editor::menu_bar;
 use pk_editor::pokemon_info;
 
 fn main() -> iced::Result {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+
     if extract_db().is_ok() {};
 
-    iced::application("PK_Editor", State::update, State::view)
+    iced::application(State::new, State::update, State::view)
+        .subscription(State::subscription)
+        .title("PK_Editor")
         .centered()
         .font(icon::FONT)
         .theme(State::theme)
         .window_size([WINDOW_WIDTH + 50.0, WINDOW_HEIGHT])
-        .run_with(State::new)
+        .run()
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct State {
     theme: Theme,
     show_modal: bool,
+    drag: Option<DragState>,
     save_file: SaveFile,
     party: Vec<Pokemon>,
     selected: Option<Id>,
@@ -52,6 +67,7 @@ pub struct State {
     berry_bag: Vec<(String, u16)>,
     selected_pokemon_storage: StorageType,
     cb_state: iced::widget::combo_box::State<String>,
+    images: HashMap<String, image::Handle>,
 }
 
 #[derive(Debug)]
@@ -75,6 +91,7 @@ impl State {
             State {
                 error: None,
                 tm_bag: vec![],
+                drag: None,
                 selected: None,
                 key_bag: vec![],
                 item_bag: vec![],
@@ -88,17 +105,34 @@ impl State {
                 selected_tab: Some(Id::new("1")),
                 selected_bag: Some(Id::new("1")),
                 screen: Some(Screen::PartyBoxes),
+                //screen: None,
                 party: vec![Pokemon::default(); 6],
                 current_pc: vec![Pokemon::default(); 30],
                 selected_pokemon_storage: StorageType::None,
                 cb_state: iced::widget::combo_box::State::new(species),
+                images: HashMap::new(),
             },
-            Task::none(),
+            Task::perform(load_images(), Message::ImagesListed),
         )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ImagesListed(Ok(images)) => {
+                self.images = images;
+
+                Task::none()
+            }
+            Message::ImagesListed(Err(error)) => {
+                match error {
+                    Error::DialogClosed => self.show_modal = false,
+                    _ => {
+                        let error_msg = error.to_string();
+                        return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                    }
+                }
+                Task::none()
+            }
             Message::MenuBar(message) => match message {
                 menu_bar::Message::OpenFile => {
                     self.show_modal = true;
@@ -121,7 +155,7 @@ impl State {
                 }
             },
             Message::Bag(message) => {
-                bag::update(
+                if let Err(error) = bag::update(
                     &mut self.tm_bag,
                     &mut self.key_bag,
                     &mut self.item_bag,
@@ -130,23 +164,32 @@ impl State {
                     &mut self.save_file,
                     &mut self.selected_bag,
                     message,
-                );
+                ) {
+                    let error_msg = error.to_string();
+                    return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                }
                 self.update(Message::UpdateChanges)
             }
             Message::PokemonInfo(message) => {
-                pokemon_info::update(
+                if let Err(error) = pokemon_info::update(
                     &mut self.selected_pokemon,
                     &self.save_file.ot_name(),
                     &self.save_file.ot_id(),
                     message,
-                );
+                ) {
+                    let error_msg = error.to_string();
+                    return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                }
                 self.update(Message::UpdateChanges)
             }
             Message::FileOpened(Ok(path)) => Task::perform(load_file(path), Message::LoadFile),
             Message::FileOpened(Err(error)) => {
                 match error {
                     Error::DialogClosed => self.show_modal = false,
-                    _ => self.error = Some(error),
+                    _ => {
+                        let error_msg = error.to_string();
+                        return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                    }
                 }
                 Task::none()
             }
@@ -183,22 +226,26 @@ impl State {
                 self.update(Message::UpdateChanges)
             }
             Message::LoadFile(Err(error)) => {
-                self.show_modal = false;
-                self.error = Some(error);
-                Task::none()
+                let error_msg = error.to_string();
+                Task::perform(save_error_dialog(error_msg), |_| Message::HideModal)
             }
             Message::WriteFile(Ok(_)) => {
                 Task::perform(save_success_dialog(), |_| Message::HideModal)
             }
             Message::WriteFile(Err(error)) => {
-                self.error = Some(error);
-                Task::none()
+                let error_msg = error.to_string();
+                Task::perform(save_error_dialog(error_msg), |_| Message::HideModal)
             }
             Message::UpdateChanges => {
                 if let Some(mut selected_pokemon) = &self.selected_pokemon {
                     selected_pokemon.update_checksum();
-                    self.save_file
-                        .save_pokemon(self.selected_pokemon_storage, selected_pokemon);
+                    if let Err(error) = self
+                        .save_file
+                        .save_pokemon(self.selected_pokemon_storage, selected_pokemon)
+                    {
+                        let error_msg = error.to_string();
+                        return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                    }
                 }
 
                 self.party = self.save_file.get_party().expect("REASON");
@@ -246,6 +293,64 @@ impl State {
                     Task::none()
                 }
             }
+            Message::DragStart(offset, storage, origin, nat_dex_number, i) => {
+                tracing::debug!(?storage, offset, i, "DragStart");
+                let handle = self
+                    .images
+                    .get(&format!("{:0width$}", nat_dex_number, width = 4))
+                    .unwrap_or({
+                        let width = 10;
+                        let height = 10;
+                        let size = (width * height) as usize;
+                        let pixels = vec![0u8; size * 4];
+                        &image::Handle::from_rgba(width, height, pixels)
+                    })
+                    .clone();
+
+                self.drag = Some(DragState {
+                    storage,
+                    cursor: origin,
+                    handle,
+                    index: i,
+                });
+                Task::none()
+            }
+            Message::DragMoved(pos) => {
+                if let Some(d) = &mut self.drag {
+                    d.cursor = pos;
+                }
+                Task::none()
+            }
+            Message::DragDrop(_, to_storage, to_index) => {
+                tracing::debug!(?to_storage, to_index, "DragDrop");
+                if let Some(from) = self.drag.take() {
+                    let from_pokemon = match from.storage {
+                        StorageType::PC => self.current_pc[from.index],
+                        StorageType::Party => self.party[from.index],
+                        StorageType::None => return Task::none(),
+                    };
+                    let to_pokemon = match to_storage {
+                        StorageType::PC => self.current_pc[to_index],
+                        StorageType::Party => self.party[to_index],
+                        StorageType::None => return Task::none(),
+                    };
+                    self.save_file
+                        .swap_pokemon(from_pokemon, from.storage, to_pokemon, to_storage)
+                        .expect("REASON");
+
+                    return self.update(Message::UpdateChanges);
+                }
+                Task::none()
+            }
+            Message::DragReleased => {
+                if self.drag.is_some() {
+                    tracing::debug!("DragReleased — cancelling drag");
+                    self.drag = None;
+                } else {
+                    tracing::debug!("DragReleased — already handled by DragDrop");
+                }
+                Task::none()
+            }
             Message::Loaded(_) => todo!(), //_ => Task::none(),
             Message::HideModal => {
                 self.show_modal = false;
@@ -265,6 +370,8 @@ impl State {
                 &self.party,
                 &self.current_pc_index,
                 &self.current_pc,
+                &self.images,
+                &self.drag,
             ),
             Some(Screen::BagTrainer) => bag(
                 &self.selected_bag,
@@ -274,29 +381,41 @@ impl State {
                 &self.berry_bag,
                 &self.tm_bag,
                 &self.key_bag,
+                &self.images,
             ),
             _ => container("").into(),
         });
 
         if self.show_modal {
-            iced::widget::stack![
-                content,
-                opaque(
+            let layers = iced::widget::Stack::new().push(content);
+
+            layers
+                .push(opaque(
                     container("")
                         .width(WINDOW_WIDTH + 50.0)
                         .height(WINDOW_HEIGHT)
-                        .style(|_theme| {
-                            container::Style {
-                                background: Some(
-                                    iced::Color {
-                                        a: 0.8,
-                                        ..iced::Color::BLACK
-                                    }
-                                    .into(),
-                                ),
-                                ..container::Style::default()
-                            }
-                        })
+                        .style(|_theme| container::Style {
+                            background: Some(
+                                iced::Color {
+                                    a: 0.8,
+                                    ..iced::Color::BLACK
+                                }
+                                .into(),
+                            ),
+                            ..container::Style::default()
+                        }),
+                ))
+                .width(WINDOW_WIDTH + 50.0)
+                .height(WINDOW_HEIGHT)
+                .into()
+        } else if let Some(drag) = &self.drag {
+            //let offset = drag.cursor - drag.origin;
+            iced::widget::stack![
+                content,
+                iced::widget::float(image(drag.handle.clone()).width(80).height(80)).translate(
+                    move |b, _vp| {
+                        Vector::new(drag.cursor.x - b.x - 40.0, drag.cursor.y - b.y - 40.0)
+                    },
                 )
             ]
             .width(WINDOW_WIDTH + 50.0)
@@ -310,6 +429,39 @@ impl State {
     fn theme(&self) -> Theme {
         self.theme.clone()
     }
+
+    fn subscription(&self) -> Subscription<Message> {
+        if self.drag.is_some() {
+            event::listen_with(|event, _, _| match event {
+                event::Event::Mouse(mouse::Event::CursorMoved { position, .. }) => {
+                    Some(Message::DragMoved(position))
+                }
+                event::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                    Some(Message::DragReleased)
+                }
+                _ => None,
+            })
+        } else {
+            Subscription::none()
+        }
+    }
+}
+
+async fn load_images() -> Result<HashMap<String, image::Handle>, Error> {
+    let folders = ["icons", "Items", "Pokemon", "Types"];
+    let mut images: HashMap<String, image::Handle> = HashMap::new();
+    for folder in folders {
+        let dir = PROJECT_DIR
+            .get_dir(folder)
+            .ok_or_else(|| Error::MissingDirectory(folder.to_string()))?;
+
+        images.extend(dir.files().filter_map(|f| {
+            let name = f.path().file_stem()?.to_str()?.to_owned();
+            Some((name, image::Handle::from_bytes(f.contents())))
+        }));
+    }
+
+    Ok(images)
 }
 
 async fn save_success_dialog() {
@@ -317,6 +469,16 @@ async fn save_success_dialog() {
         .set_title("Saved")
         .set_level(rfd::MessageLevel::Info)
         .set_description("Backup succesful!")
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show()
+        .await;
+}
+
+async fn save_error_dialog(message: String) {
+    rfd::AsyncMessageDialog::new()
+        .set_title("Error")
+        .set_level(rfd::MessageLevel::Error)
+        .set_description(&message)
         .set_buttons(rfd::MessageButtons::Ok)
         .show()
         .await;

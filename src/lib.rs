@@ -11,3 +11,16 @@ pub use message::Message;
 pub use screen::*;
 pub use theme::*;
 pub use widgets::*;
+
+use iced::widget::image;
+use iced::Point;
+use pk_edit::save::storage::StorageType;
+
+/// Holds the state of an in-progress drag operation.
+#[derive(Debug)]
+pub struct DragState {
+    pub storage: StorageType,
+    pub cursor: Point,
+    pub handle: image::Handle,
+    pub index: usize,
+}

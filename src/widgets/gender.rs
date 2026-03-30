@@ -1,3 +1,10 @@
+//! A 26 × 26 gender badge widget.
+//!
+//! [`Gender`] renders either ♀ (female, `#d65c63`) or ♂ (male, `#4186d7`) inside a
+//! small rounded badge. It is a leaf [`Widget`] with no interaction and no children.
+//!
+//! Construct one with [`gender`], passing a [`pk_edit::pokemon::Gender`] value.
+
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::tree::Tree;
@@ -76,7 +83,7 @@ where
     }
 
     fn layout(
-        &self,
+        &mut self,
         tree: &mut widget::Tree,
         renderer: &Renderer,
         limits: &layout::Limits,
@@ -86,7 +93,7 @@ where
             size,
             vec![self
                 .content
-                .as_widget()
+                .as_widget_mut()
                 .layout(&mut tree.children[0], renderer, limits)
                 .align(iced::Alignment::Center, iced::Alignment::Center, size)],
         )
@@ -115,6 +122,7 @@ where
                 bounds: layout.bounds(),
                 border: w_style.border,
                 shadow: w_style.shadow,
+                ..Default::default()
             },
             background.unwrap(),
         );

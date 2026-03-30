@@ -1,14 +1,25 @@
+//! The **Bag & Trainer** screen.
+//!
+//! Renders five scrollable bag pockets — Items, Pokéballs, Berries, TMs, and
+//! Key Items — each row showing an item sprite, a pick-list for the item name,
+//! and an [`crate::widgets::item_counter`] for the quantity.
+//!
+//! Owns its own [`Message`] enum and [`update`] function which validate
+//! quantities (0–99) and write changes back into the [`pk_edit::SaveFile`].
+
 use iced::advanced::widget::Id;
 use iced::widget::container;
 use iced::widget::image;
-use iced::widget::{column, pick_list, row, scrollable, text, text_input};
-use iced::Length;
-use iced::{Alignment, Element};
+use iced::widget::{column, pick_list, row, scrollable, text};
+use iced::{Alignment, Element, Length, Padding};
+use pk_edit::error::SaveDataError;
+
+use std::collections::HashMap;
 
 use crate::message;
-use crate::misc::PROJECT_DIR;
 use crate::pick_list_default;
-use crate::tab_bar_tab;
+use crate::widgets::item_counter;
+use crate::{shadow_box_light, tab_bar_tab};
 
 use pk_edit::misc::{balls, berries, item_id, items, key_items, tms};
 use pk_edit::save::storage::Pocket;
@@ -21,131 +32,87 @@ use crate::tab;
 #[derive(Debug, Clone)]
 pub enum Message {
     SelectedBag(Id),
-    ItemChanged(usize, String),
-    ItemQuantityChanged(usize, String),
-    BallChanged(usize, String),
-    BallQuantityChanged(usize, String),
-    BerryChanged(usize, String),
-    BerryQuantityChanged(usize, String),
-    TmChanged(usize, String),
-    TmQuantityChanged(usize, String),
-    KeyChanged(usize, String),
+    ItemChanged(Pocket, usize, String),
+    ItemQuantityChanged(Pocket, usize, String, Operation),
+}
+
+#[derive(Debug, Clone)]
+pub enum Operation {
+    Change,
+    Increment,
+    Decrement,
 }
 
 pub fn update(
     tm_bag: &mut [(String, u16)],
-    key_bag: &mut Vec<(String, u16)>,
-    item_bag: &mut Vec<(String, u16)>,
-    ball_bag: &mut Vec<(String, u16)>,
-    berry_bag: &mut Vec<(String, u16)>,
+    key_bag: &mut [(String, u16)],
+    item_bag: &mut [(String, u16)],
+    ball_bag: &mut [(String, u16)],
+    berry_bag: &mut [(String, u16)],
     save_file: &mut SaveFile,
     selected_bag: &mut Option<Id>,
     message: Message,
-) {
+) -> Result<(), SaveDataError> {
     match message {
         Message::SelectedBag(id) => {
             selected_bag.replace(id);
+            Ok(())
         }
-        Message::ItemChanged(i, selected) => {
-            item_bag[i].0 = selected;
-            if item_bag[i].1 == 0 {
-                item_bag[i].1 = 1;
+        Message::ItemChanged(pocket, i, selected) => {
+            let bag = match pocket {
+                Pocket::Berries => berry_bag,
+                Pocket::Items => item_bag,
+                Pocket::Key => key_bag,
+                Pocket::Pokeballs => ball_bag,
+                Pocket::Tms => tm_bag,
+            };
+
+            let item = bag.get_mut(i).ok_or(SaveDataError::InvalidIndex(i))?;
+            if "Nothing".eq(&selected) && pocket != Pocket::Key {
+                item.1 = 0;
+            } else if item.1 == 0 && pocket != Pocket::Key {
+                item.1 = 1;
             }
-            save_file.save_pocket(Pocket::Items, item_bag.clone());
+            item.0 = selected;
+            save_file.save_pocket(pocket, bag.to_owned())
         }
-        Message::ItemQuantityChanged(i, mut value) => {
-            value.retain(|c| c.is_numeric());
-            if let Ok(number) = value.parse::<u16>() {
-                if number >= 99 {
-                    item_bag[i].1 = 99;
-                } else if number == 0 {
-                    item_bag[i].1 = 0;
-                    item_bag[i].0 = "Nothing".to_string();
-                } else {
-                    item_bag[i].1 = number;
+        Message::ItemQuantityChanged(pocket, i, mut quantity, operation) => {
+            quantity.retain(|c| c.is_numeric());
+            let bag = match pocket {
+                Pocket::Berries => berry_bag,
+                Pocket::Items => item_bag,
+                Pocket::Key => key_bag,
+                Pocket::Pokeballs => ball_bag,
+                Pocket::Tms => tm_bag,
+            };
+            let item = bag.get_mut(i).ok_or(SaveDataError::InvalidIndex(i))?;
+            if item.0 == "Nothing" {
+                return Ok(());
+            }
+
+            if let Ok(mut number) = quantity.parse::<u16>() {
+                match operation {
+                    Operation::Increment => {
+                        number += 1;
+                    }
+                    Operation::Decrement => {
+                        number -= 1;
+                    }
+                    Operation::Change => {}
                 }
-                save_file.save_pocket(Pocket::Items, item_bag.clone());
-            }
-        }
-        Message::BallChanged(i, selected) => {
-            ball_bag[i].0 = selected;
-            if ball_bag[i].0 == "Nothing" {
-                ball_bag[i].1 = 0;
-            } else if ball_bag[i].1 == 0 {
-                ball_bag[i].1 = 1;
-            }
-            save_file.save_pocket(Pocket::Pokeballs, ball_bag.clone());
-        }
-        Message::BallQuantityChanged(i, mut value) => {
-            value.retain(|c| c.is_numeric());
-            if let Ok(number) = value.parse::<u16>() {
                 if number >= 99 {
-                    ball_bag[i].1 = 99;
+                    item.1 = 99;
                 } else if number == 0 {
-                    ball_bag[i].1 = 0;
-                    ball_bag[i].0 = "Nothing".to_string();
+                    item.1 = 0;
+                    item.0 = "Nothing".to_string();
                 } else {
-                    ball_bag[i].1 = number;
+                    item.1 = number;
                 }
-                save_file.save_pocket(Pocket::Pokeballs, ball_bag.clone());
+                return save_file.save_pocket(pocket, bag.to_owned());
             }
+            Ok(())
         }
-        Message::BerryChanged(i, selected) => {
-            berry_bag[i].0 = selected;
-            if berry_bag[i].0 == "Nothing" {
-                berry_bag[i].1 = 0;
-            } else if berry_bag[i].1 == 0 {
-                berry_bag[i].1 = 1;
-            }
-            save_file.save_pocket(Pocket::Berries, berry_bag.clone());
-        }
-        Message::BerryQuantityChanged(i, mut value) => {
-            value.retain(|c| c.is_numeric());
-            if let Ok(number) = value.parse::<u16>() {
-                if number >= 99 {
-                    berry_bag[i].1 = 99;
-                } else if number == 0 {
-                    berry_bag[i].1 = 0;
-                    berry_bag[i].0 = "Nothing".to_string();
-                } else {
-                    berry_bag[i].1 = number;
-                }
-                save_file.save_pocket(Pocket::Berries, berry_bag.clone());
-            }
-        }
-        Message::TmChanged(i, selected) => {
-            tm_bag[i].0 = selected;
-            if tm_bag[i].0 == "Nothing" {
-                tm_bag[i].1 = 0;
-            } else if tm_bag[i].1 == 0 {
-                tm_bag[i].1 = 1;
-            }
-            save_file.save_pocket(Pocket::Tms, tm_bag.to_owned());
-        }
-        Message::TmQuantityChanged(i, mut value) => {
-            value.retain(|c| c.is_numeric());
-            if let Ok(number) = value.parse::<u16>() {
-                if number >= 99 {
-                    tm_bag[i].1 = 99;
-                } else if number == 0 {
-                    tm_bag[i].1 = 0;
-                    tm_bag[i].0 = "Nothing".to_string();
-                } else {
-                    tm_bag[i].1 = number;
-                }
-                save_file.save_pocket(Pocket::Tms, tm_bag.to_owned());
-            }
-        }
-        Message::KeyChanged(i, selected) => {
-            key_bag[i].0 = selected;
-            if key_bag[i].0 == "Nothing" {
-                key_bag[i].1 = 0;
-            } else if key_bag[i].1 == 0 {
-                key_bag[i].1 = 1;
-            }
-            save_file.save_pocket(Pocket::Key, key_bag.clone());
-        }
-    };
+    }
 }
 
 pub fn bag<'a>(
@@ -156,30 +123,31 @@ pub fn bag<'a>(
     berries: &'a [(String, u16)],
     tms: &'a [(String, u16)],
     key_items: &'a [(String, u16)],
+    images: &HashMap<String, image::Handle>,
 ) -> Element<'a, message::Message> {
     column![
-        menu_bar::view(selected_tab).map(message::Message::MenuBar),
+        menu_bar::view(selected_tab, images).map(message::Message::MenuBar),
         row![
-            iced::widget::Space::with_width(Length::Fill),
-            bag_tab_bar(selected_bag).map(message::Message::Bag),
-            iced::widget::Space::with_width(Length::Fill)
+            iced::widget::Space::new().width(Length::Fill),
+            bag_tab_bar(selected_bag, images).map(message::Message::Bag),
+            iced::widget::Space::new().width(Length::Fill)
         ],
         row![
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
             if Some(Id::new("1")) == *selected_bag {
-                items_bag(items).map(message::Message::Bag)
+                items_bag(items, images).map(message::Message::Bag)
             } else if Some(Id::new("2")) == *selected_bag {
-                balls_bag(balls).map(message::Message::Bag)
+                balls_bag(balls, images).map(message::Message::Bag)
             } else if Some(Id::new("3")) == *selected_bag {
-                berries_bag(berries).map(message::Message::Bag)
+                berries_bag(berries, images).map(message::Message::Bag)
             } else if Some(Id::new("4")) == *selected_bag {
-                tms_bag(tms).map(message::Message::Bag)
+                tms_bag(tms, images).map(message::Message::Bag)
             } else if Some(Id::new("5")) == *selected_bag {
-                keys_bag(key_items).map(message::Message::Bag)
+                keys_bag(key_items, images).map(message::Message::Bag)
             } else {
                 text("").into()
             },
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
         ]
         .spacing(15),
     ]
@@ -187,56 +155,74 @@ pub fn bag<'a>(
     .into()
 }
 
-fn bag_tab_bar<'a>(selected: &Option<Id>) -> Element<'a, Message> {
-    let handle = image::Handle::from_bytes(
-        PROJECT_DIR
-            .get_file("icons/battle_items_icon.png")
-            .unwrap()
-            .contents(),
-    );
-    let battle = row![image(handle), text("Items")]
-        .spacing(10.0)
-        .align_y(Alignment::Center);
+fn bag_tab_bar<'a>(
+    selected: &Option<Id>,
+    images: &HashMap<String, image::Handle>,
+) -> Element<'a, Message> {
+    let battle = row![
+        image(images.get("battle_items_icon").unwrap_or({
+            let width = 10;
+            let height = 10;
+            let size = (width * height) as usize;
+            let pixels = vec![0u8; size * 4];
+            &image::Handle::from_rgba(width, height, pixels)
+        })),
+        text("Items")
+    ]
+    .spacing(10.0)
+    .align_y(Alignment::Center);
 
-    let handle = image::Handle::from_bytes(
-        PROJECT_DIR
-            .get_file("icons/poke_balls_icon.png")
-            .unwrap()
-            .contents(),
-    );
-    let poke_ball = row![image(handle), text("Pokeballs")]
-        .spacing(10.0)
-        .align_y(iced::alignment::Vertical::Center);
+    let poke_ball = row![
+        image(images.get("poke_balls_icon").unwrap_or({
+            let width = 10;
+            let height = 10;
+            let size = (width * height) as usize;
+            let pixels = vec![0u8; size * 4];
+            &image::Handle::from_rgba(width, height, pixels)
+        })),
+        text("Pokeballs")
+    ]
+    .spacing(10.0)
+    .align_y(iced::alignment::Vertical::Center);
 
-    let handle = image::Handle::from_bytes(
-        PROJECT_DIR
-            .get_file("icons/berries_icon.png")
-            .unwrap()
-            .contents(),
-    );
-    let berry = row![image(handle), text("Berries")]
-        .spacing(10.0)
-        .align_y(iced::alignment::Vertical::Center);
+    let berry = row![
+        image(images.get("berries_icon").unwrap_or({
+            let width = 10;
+            let height = 10;
+            let size = (width * height) as usize;
+            let pixels = vec![0u8; size * 4];
+            &image::Handle::from_rgba(width, height, pixels)
+        })),
+        text("Berries")
+    ]
+    .spacing(10.0)
+    .align_y(iced::alignment::Vertical::Center);
 
-    let handle = image::Handle::from_bytes(
-        PROJECT_DIR
-            .get_file("icons/tms_icon.png")
-            .unwrap()
-            .contents(),
-    );
-    let tm = row![image(handle), text("TMs")]
-        .spacing(10.0)
-        .align_y(iced::alignment::Vertical::Center);
+    let tm = row![
+        image(images.get("tms_icon").unwrap_or({
+            let width = 10;
+            let height = 10;
+            let size = (width * height) as usize;
+            let pixels = vec![0u8; size * 4];
+            &image::Handle::from_rgba(width, height, pixels)
+        })),
+        text("TMs")
+    ]
+    .spacing(10.0)
+    .align_y(iced::alignment::Vertical::Center);
 
-    let handle = image::Handle::from_bytes(
-        PROJECT_DIR
-            .get_file("icons/key_items_icon.png")
-            .unwrap()
-            .contents(),
-    );
-    let key = row![image(handle), text("Key Items")]
-        .spacing(10.0)
-        .align_y(iced::alignment::Vertical::Center);
+    let key = row![
+        image(images.get("key_items_icon").unwrap_or({
+            let width = 10;
+            let height = 10;
+            let size = (width * height) as usize;
+            let pixels = vec![0u8; size * 4];
+            &image::Handle::from_rgba(width, height, pixels)
+        })),
+        text("Key Items")
+    ]
+    .spacing(10.0)
+    .align_y(iced::alignment::Vertical::Center);
 
     container(row![
         tab(battle)
@@ -270,8 +256,11 @@ fn bag_tab_bar<'a>(selected: &Option<Id>) -> Element<'a, Message> {
     .into()
 }
 
-fn items_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
-    let mut column = column![];
+fn items_bag<'a>(
+    bag: &'a [(String, u16)],
+    images: &HashMap<String, image::Handle>,
+) -> Element<'a, Message> {
+    let mut column = column![].spacing(10);
 
     let items = match items() {
         Ok(is) => is,
@@ -282,41 +271,48 @@ fn items_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
 
     for (i, (item, quantity)) in bag.iter().enumerate() {
         let item_id = item_id(item).unwrap_or_default();
-
-        let item_image = if let Some(item_image) =
-            PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
-        {
-            let handle = image::Handle::from_bytes(item_image.contents());
-            image(handle).height(40)
-        } else {
-            image("").width(40)
-        };
+        let item_image =
+            if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
+                image(handle).height(40)
+            } else {
+                image(images.get("other_items_icon").unwrap_or({
+                    let width = 10;
+                    let height = 10;
+                    let size = (width * height) as usize;
+                    let pixels = vec![0u8; size * 4];
+                    &image::Handle::from_rgba(width, height, pixels)
+                }))
+                .width(40)
+            };
 
         column = column.push(
-            row![
-                item_image,
-                pick_list(items.clone(), Some(item), move |selected| {
-                    Message::ItemChanged(i, selected)
-                })
-                .width(150)
-                .style(pick_list_default),
-                text_input(&quantity.to_string(), &quantity.to_string())
-                    .on_input(move |input| Message::ItemQuantityChanged(i, input))
-                    .line_height(text::LineHeight::Absolute(10.into()))
-                    .width(30)
-                    .size(12),
-            ]
-            .align_y(Alignment::Center)
-            .spacing(25)
-            .width(320)
+            container(
+                row![
+                    item_image,
+                    pick_list(items.clone(), Some(item), move |selected| {
+                        Message::ItemChanged(Pocket::Items, i, selected)
+                    })
+                    .width(150)
+                    .style(pick_list_default),
+                    item_counter(Pocket::Items, i, quantity),
+                ]
+                .padding(Padding::from([0, 10]))
+                .align_y(Alignment::Center)
+                .spacing(25),
+            )
+            .style(shadow_box_light)
+            .width(350)
             .height(40.0),
         )
     }
     scrollable(column).into()
 }
 
-fn balls_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
-    let mut column = column![];
+fn balls_bag<'a>(
+    bag: &'a [(String, u16)],
+    images: &HashMap<String, image::Handle>,
+) -> Element<'a, Message> {
+    let mut column = column![].spacing(10);
 
     let balls = match balls() {
         Ok(ms) => ms,
@@ -328,40 +324,48 @@ fn balls_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
     for (i, (item, quantity)) in bag.iter().enumerate() {
         let item_id = item_id(item).unwrap_or_default();
 
-        let item_image = if let Some(item_image) =
-            PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
-        {
-            let handle = image::Handle::from_bytes(item_image.contents());
-            image(handle).height(40)
-        } else {
-            image("").width(40)
-        };
+        let item_image =
+            if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
+                image(handle).height(40)
+            } else {
+                image(images.get("poke_balls_icon").unwrap_or({
+                    let width = 10;
+                    let height = 10;
+                    let size = (width * height) as usize;
+                    let pixels = vec![0u8; size * 4];
+                    &image::Handle::from_rgba(width, height, pixels)
+                }))
+                .width(40)
+            };
 
         column = column.push(
-            row![
-                item_image,
-                pick_list(balls.clone(), Some(item), move |selected| {
-                    Message::BallChanged(i, selected)
-                })
-                .width(150)
-                .style(pick_list_default),
-                text_input(&quantity.to_string(), &quantity.to_string())
-                    .on_input(move |input| Message::BallQuantityChanged(i, input))
-                    .line_height(text::LineHeight::Absolute(10.into()))
-                    .width(30)
-                    .size(12),
-            ]
-            .align_y(Alignment::Center)
-            .spacing(25)
-            .width(320)
+            container(
+                row![
+                    item_image,
+                    pick_list(balls.clone(), Some(item), move |selected| {
+                        Message::ItemChanged(Pocket::Pokeballs, i, selected)
+                    })
+                    .width(150)
+                    .style(pick_list_default),
+                    item_counter(Pocket::Pokeballs, i, quantity),
+                ]
+                .padding(Padding::from([0, 10]))
+                .align_y(Alignment::Center)
+                .spacing(25),
+            )
+            .style(shadow_box_light)
+            .width(350)
             .height(40.0),
         )
     }
     scrollable(column).into()
 }
 
-fn berries_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
-    let mut column = column![];
+fn berries_bag<'a>(
+    bag: &'a [(String, u16)],
+    images: &HashMap<String, image::Handle>,
+) -> Element<'a, Message> {
+    let mut column = column![].spacing(10);
 
     let berries = match berries() {
         Ok(ms) => ms,
@@ -373,40 +377,48 @@ fn berries_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
     for (i, (item, quantity)) in bag.iter().enumerate() {
         let item_id = item_id(item).unwrap_or_default();
 
-        let item_image = if let Some(item_image) =
-            PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
-        {
-            let handle = image::Handle::from_bytes(item_image.contents());
-            image(handle).height(40)
-        } else {
-            image("").width(40)
-        };
+        let item_image =
+            if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
+                image(handle).height(40)
+            } else {
+                image(images.get("berries_icon").unwrap_or({
+                    let width = 10;
+                    let height = 10;
+                    let size = (width * height) as usize;
+                    let pixels = vec![0u8; size * 4];
+                    &image::Handle::from_rgba(width, height, pixels)
+                }))
+                .width(40)
+            };
 
         column = column.push(
-            row![
-                item_image,
-                pick_list(berries.clone(), Some(item), move |selected| {
-                    Message::BerryChanged(i, selected)
-                })
-                .width(150)
-                .style(pick_list_default),
-                text_input(&quantity.to_string(), &quantity.to_string())
-                    .on_input(move |input| Message::BerryQuantityChanged(i, input))
-                    .line_height(text::LineHeight::Absolute(10.into()))
-                    .width(30)
-                    .size(12),
-            ]
-            .align_y(Alignment::Center)
-            .spacing(25)
-            .width(320)
+            container(
+                row![
+                    item_image,
+                    pick_list(berries.clone(), Some(item), move |selected| {
+                        Message::ItemChanged(Pocket::Berries, i, selected)
+                    })
+                    .width(150)
+                    .style(pick_list_default),
+                    item_counter(Pocket::Berries, i, quantity),
+                ]
+                .padding(Padding::from([0, 10]))
+                .align_y(Alignment::Center)
+                .spacing(25),
+            )
+            .style(shadow_box_light)
+            .width(350)
             .height(40.0),
         )
     }
     scrollable(column).into()
 }
 
-fn tms_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
-    let mut column = column![];
+fn tms_bag<'a>(
+    bag: &'a [(String, u16)],
+    images: &HashMap<String, image::Handle>,
+) -> Element<'a, Message> {
+    let mut column = column![].spacing(10);
 
     let tms = match tms() {
         Ok(ms) => ms,
@@ -418,40 +430,48 @@ fn tms_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
     for (i, (item, quantity)) in bag.iter().enumerate() {
         let item_id = item_id(item).unwrap_or_default();
 
-        let item_image = if let Some(item_image) =
-            PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
-        {
-            let handle = image::Handle::from_bytes(item_image.contents());
-            image(handle).height(40)
-        } else {
-            image("").width(40)
-        };
+        let item_image =
+            if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
+                image(handle).height(40)
+            } else {
+                image(images.get("tms_icon").unwrap_or({
+                    let width = 10;
+                    let height = 10;
+                    let size = (width * height) as usize;
+                    let pixels = vec![0u8; size * 4];
+                    &image::Handle::from_rgba(width, height, pixels)
+                }))
+                .width(40)
+            };
 
         column = column.push(
-            row![
-                item_image,
-                pick_list(tms.clone(), Some(item), move |selected| {
-                    Message::TmChanged(i, selected)
-                })
-                .width(150)
-                .style(pick_list_default),
-                text_input(&quantity.to_string(), &quantity.to_string())
-                    .on_input(move |input| Message::TmQuantityChanged(i, input))
-                    .line_height(text::LineHeight::Absolute(10.into()))
-                    .width(30)
-                    .size(12),
-            ]
-            .align_y(Alignment::Center)
-            .spacing(25)
-            .width(320)
+            container(
+                row![
+                    item_image,
+                    pick_list(tms.clone(), Some(item), move |selected| {
+                        Message::ItemChanged(Pocket::Tms, i, selected)
+                    })
+                    .width(150)
+                    .style(pick_list_default),
+                    item_counter(Pocket::Tms, i, quantity),
+                ]
+                .padding(Padding::from([0, 10]))
+                .align_y(Alignment::Center)
+                .spacing(25),
+            )
+            .style(shadow_box_light)
+            .width(350)
             .height(40.0),
         )
     }
     scrollable(column).into()
 }
 
-fn keys_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
-    let mut column = column![];
+fn keys_bag<'a>(
+    bag: &'a [(String, u16)],
+    images: &HashMap<String, image::Handle>,
+) -> Element<'a, Message> {
+    let mut column = column![].spacing(10);
 
     let key_items = match key_items() {
         Ok(ms) => ms,
@@ -463,33 +483,36 @@ fn keys_bag<'a>(bag: &'a [(String, u16)]) -> Element<'a, Message> {
     for (i, (item, _)) in bag.iter().enumerate() {
         let item_id = item_id(item).unwrap_or_default();
 
-        let item_image = if let Some(item_image) =
-            PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
-        {
-            let handle = image::Handle::from_bytes(item_image.contents());
-            image(handle).height(40)
-        } else {
-            let handle = image::Handle::from_bytes(
-                PROJECT_DIR
-                    .get_file("icons/other_items_icon.png")
-                    .unwrap()
-                    .contents(),
-            );
-            image(handle).width(40)
-        };
+        let item_image =
+            if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
+                image(handle).height(40)
+            } else {
+                image(images.get("key_items_icon").unwrap_or({
+                    let width = 10;
+                    let height = 10;
+                    let size = (width * height) as usize;
+                    let pixels = vec![0u8; size * 4];
+                    &image::Handle::from_rgba(width, height, pixels)
+                }))
+                .width(40)
+            };
 
         column = column.push(
-            row![
-                item_image,
-                pick_list(key_items.clone(), Some(item), move |selected| {
-                    Message::KeyChanged(i, selected)
-                })
-                .width(150)
-                .style(pick_list_default),
-            ]
-            .align_y(Alignment::Center)
-            .spacing(25)
-            .width(320)
+            container(
+                row![
+                    item_image,
+                    pick_list(key_items.clone(), Some(item), move |selected| {
+                        Message::ItemChanged(Pocket::Key, i, selected)
+                    })
+                    .width(150)
+                    .style(pick_list_default),
+                ]
+                .padding(Padding::from([0, 10]))
+                .align_y(Alignment::Center)
+                .spacing(25),
+            )
+            .style(shadow_box_light)
+            .width(350)
             .height(40.0),
         )
     }

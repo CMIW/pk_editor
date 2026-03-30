@@ -1,3 +1,8 @@
+//! An 80 × 26 level-display widget.
+//!
+//! [`Level`] renders "Lv. N" in a dark rounded pill with white text.
+//! It is a leaf [`Widget`] with no interaction; use [`level`] to construct one.
+
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::tree::Tree;
@@ -63,7 +68,7 @@ where
     }
 
     fn layout(
-        &self,
+        &mut self,
         tree: &mut widget::Tree,
         renderer: &Renderer,
         limits: &layout::Limits,
@@ -73,7 +78,7 @@ where
             size,
             vec![self
                 .content
-                .as_widget()
+                .as_widget_mut()
                 .layout(&mut tree.children[0], renderer, limits)
                 .align(iced::Alignment::Center, iced::Alignment::Center, size)],
         )
@@ -96,6 +101,7 @@ where
                 bounds: layout.bounds(),
                 border: w_style.border,
                 shadow: w_style.shadow,
+                ..Default::default()
             },
             w_style.background.unwrap(),
         );

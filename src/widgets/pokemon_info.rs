@@ -1,10 +1,36 @@
+//! The Pokémon information and editing panel.
+//!
+//! Occupies the right third of the **Party & Boxes** screen when a Pokémon is selected.
+//! The panel is divided into scrollable sections:
+//!
+//! 1. **Header** — Pokéball picker, nickname, Pokérus toggle, level input, gender badge.
+//! 2. **Species** — National Dex number, species combo box, language.
+//! 3. **Typing** — type icon(s) for the selected species.
+//! 4. **Stats** — `HP` / `Atk` / `Def` / `SpA` / `SpD` / `Spe` with colour-coded bars and IV/EV inputs.
+//! 5. **OT info** — original trainer name and ID (read-only).
+//! 6. **PID / Friendship** — personality value (read-only display) and editable friendship.
+//! 7. **Nature / Ability** — nature pick list and ability text.
+//! 8. **Held Item** — item sprite and pick list.
+//! 9. **Moves** — up to four [`crate::widgets::move_slot`] rows.
+//!
+//! Owns its own [`Message`] enum and [`update`] function which validate inputs
+//! and mutate the selected [`pk_edit::pokemon::Pokemon`].
+
+use iced::alignment::Horizontal;
 use iced::color;
 use iced::widget::{button, text_input};
-use iced::widget::{column, combo_box, container, image, mouse_area, pick_list, row, text};
+use iced::widget::{
+    column, combo_box, container, image, mouse_area, pick_list, row, scrollable, text,
+};
 use iced::{Alignment, Element, Length};
+use pk_edit::error::PokemonError;
+use pk_edit::misc::balls_id;
+use widgets::generic_overlay::dropdown_root;
 
-use crate::misc::{PROJECT_DIR, WINDOW_HEIGHT, WINDOW_WIDTH};
-use crate::theme::{info_label_appearance, pokemon_info_appearance};
+use std::collections::HashMap;
+
+use crate::misc::{WINDOW_HEIGHT, WINDOW_WIDTH};
+use crate::theme::{info_label_appearance, pokeball_picker_apperance, pokemon_info_appearance};
 use crate::widgets::input_level;
 
 use pk_edit::misc::{held_items, item_id, NATURE};
@@ -21,6 +47,7 @@ use crate::{pick_list_default, text_input_default};
 pub enum Message {
     AddMove(usize),
     ChangePokerusStatus,
+    ChangePokeball(u8),
     NatureSelected(String),
     SpeciesSelected(String),
     HeldItemSelected(String),
@@ -36,8 +63,14 @@ pub fn update(
     ot_name: &[u8],
     ot_id: &[u8],
     message: Message,
-) {
+) -> Result<(), PokemonError> {
     match message {
+        Message::ChangePokeball(ball_id) => {
+            if let Some(selected_pokemon) = selected_pokemon.as_mut() {
+                selected_pokemon.set_pokeball_caught(ball_id)?;
+            }
+            Ok(())
+        }
         Message::ChangePokerusStatus => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 match selected_pokemon.pokerus_status() {
@@ -52,6 +85,7 @@ pub fn update(
                     }
                 }
             }
+            Ok(())
         }
         Message::LevelInputChanged(mut value) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
@@ -68,22 +102,18 @@ pub fn update(
                     selected_pokemon.set_level(value);
                 }
             }
+            Ok(())
         }
         Message::SpeciesSelected(species) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 if selected_pokemon.is_empty() {
-                    match gen_pokemon_from_species(*selected_pokemon, &species, ot_name, ot_id) {
-                        Ok(pokemon) => {
-                            *selected_pokemon = pokemon;
-                        }
-                        Err(e) => {
-                            println!("{:?}", e);
-                        }
-                    }
+                    *selected_pokemon =
+                        gen_pokemon_from_species(*selected_pokemon, &species, ot_name, ot_id)?;
                 } else {
-                    selected_pokemon.set_species(&species);
+                    selected_pokemon.set_species(&species)?;
                 }
             }
+            Ok(())
         }
         Message::IVChanged(iv, mut value) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
@@ -94,6 +124,7 @@ pub fn update(
                     selected_pokemon.stats_mut().update_ivs(&iv, 0);
                 }
             }
+            Ok(())
         }
         Message::EVChanged(ev, mut value) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
@@ -104,6 +135,7 @@ pub fn update(
                     selected_pokemon.stats_mut().update_evs(&ev, 0);
                 }
             }
+            Ok(())
         }
         Message::FriendshipChanged(mut value) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
@@ -117,76 +149,109 @@ pub fn update(
                     selected_pokemon.set_friendship(value);
                 }
             }
+            Ok(())
         }
         Message::HeldItemSelected(item) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
-                selected_pokemon.set_item(&item);
+                selected_pokemon.set_item(&item)?;
             }
+            Ok(())
         }
         Message::MoveSelected(index, value) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
-                selected_pokemon.set_move(index, &value);
+                selected_pokemon.set_move(index, &value)?;
             }
+            Ok(())
         }
         Message::AddMove(index) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
-                selected_pokemon.set_move(index, "Pound");
+                selected_pokemon.set_move(index, "Pound")?;
             }
+            Ok(())
         }
         Message::NatureSelected(nature) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 selected_pokemon.set_nature(&nature);
             }
+            Ok(())
         }
     }
 }
 
-fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
+fn info_label(
+    pokemon: &Pokemon,
+    images: &HashMap<String, image::Handle>,
+) -> Element<'static, Message> {
     let pokeball = if pokemon.pokeball_caught() == 0 {
-        image("").width(45).height(45)
+        dropdown_root("", "")
+            .width(45)
+            .height(45)
+            .style(pokeball_picker_apperance)
     } else {
-        let handle = image::Handle::from_bytes(
-            PROJECT_DIR
-                .get_file(format!(
-                    "Items/item_{:0width$}.png",
-                    pokemon.pokeball_caught(),
-                    width = 4
-                ))
-                .unwrap()
-                .contents(),
-        );
-
-        image(handle).width(45).height(45)
+        dropdown_root(
+            image(
+                images
+                    .get(&format!(
+                        "item_{:0width$}",
+                        pokemon.pokeball_caught(),
+                        width = 4
+                    ))
+                    .unwrap_or({
+                        let width = 10;
+                        let height = 10;
+                        let size = (width * height) as usize;
+                        let pixels = vec![0u8; size * 4];
+                        &image::Handle::from_rgba(width, height, pixels)
+                    }),
+            ),
+            scrollable(column(balls_id().unwrap_or_default().iter().filter_map(
+                |x| {
+                    Some(
+                        button(
+                            image(images.get(&format!("item_{:0width$}", *x, width = 4))?)
+                                .width(45)
+                                .height(45),
+                        )
+                        .on_press(Message::ChangePokeball(*x as u8))
+                        .style(button::subtle)
+                        .into(),
+                    )
+                },
+            )))
+            .height(Length::Fixed(270.0)),
+        )
+        .overlay_width(Length::Shrink)
+        .style(pokeball_picker_apperance)
     };
 
     let pokerus = match pokemon.pokerus_status() {
-        Pokerus::None => {
-            let pokerus_handle = image::Handle::from_bytes(
-                PROJECT_DIR
-                    .get_file("icons/PokérusIC_not_infected.png")
-                    .unwrap()
-                    .contents(),
-            );
-            image(pokerus_handle).width(30).height(30)
-        }
-        Pokerus::Infected => {
-            let pokerus_handle = image::Handle::from_bytes(
-                PROJECT_DIR
-                    .get_file("icons/PokérusIC_infected.png")
-                    .unwrap()
-                    .contents(),
-            );
-            image(pokerus_handle).width(30).height(30)
-        }
-        Pokerus::Cured => {
-            let pokerus_handle = image::Handle::from_bytes(
-                PROJECT_DIR
-                    .get_file("icons/PokérusIC_cured.png")
-                    .unwrap()
-                    .contents(),
-            );
-            image(pokerus_handle).width(30).height(30)
-        }
+        Pokerus::None => image(images.get("PokérusIC_not_infected").unwrap_or({
+            let width = 10;
+            let height = 10;
+            let size = (width * height) as usize;
+            let pixels = vec![0u8; size * 4];
+            &image::Handle::from_rgba(width, height, pixels)
+        }))
+        .width(30)
+        .height(30),
+        Pokerus::Infected => image(images.get("PokérusIC_infected").unwrap_or({
+            let width = 10;
+            let height = 10;
+            let size = (width * height) as usize;
+            let pixels = vec![0u8; size * 4];
+            &image::Handle::from_rgba(width, height, pixels)
+        }))
+        .width(30)
+        .height(30),
+        Pokerus::Cured => image(images.get("PokérusIC_cured").unwrap_or({
+            let width = 10;
+            let height = 10;
+            let size = (width * height) as usize;
+            let pixels = vec![0u8; size * 4];
+            &image::Handle::from_rgba(width, height, pixels)
+        }))
+        .width(30)
+        .height(30),
     };
 
     let pokerus = mouse_area(pokerus)
@@ -198,9 +263,9 @@ fn info_label(pokemon: &Pokemon) -> Element<'static, Message> {
     let row = row![
         pokeball,
         name,
-        iced::widget::Space::with_width(Length::Fill),
+        iced::widget::Space::new().width(Length::Fill),
         pokerus,
-        iced::widget::Space::with_width(25),
+        iced::widget::Space::new().width(25),
         input_level(pokemon.level()),
         gender(pokemon.gender()),
     ]
@@ -231,13 +296,9 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
 
     let column = column![
         row![
-            iced::widget::Space::with_width(Length::Fill),
-            text("EV")
-                .width(ev_iv_width)
-                /*.horizontal_alignment(iced::alignment::Horizontal::Center)*/,
-            text("IV")
-                .width(ev_iv_width)
-                /*.horizontal_alignment(iced::alignment::Horizontal::Center)*/,
+            iced::widget::Space::new().width(Length::Fill),
+            text("EV").width(ev_iv_width).center(),
+            text("IV").width(ev_iv_width).center(),
         ]
         .spacing(5)
         .align_y(Alignment::Center),
@@ -245,7 +306,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text("HP:").width(labels_width),
             stat_bar(hp as f32 * scale),
             text(hp),
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
             text_input(&stats.hp_ev.to_string(), &stats.hp_ev.to_string())
                 .on_input(|input| Message::EVChanged(String::from("HP"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
@@ -263,7 +324,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text("Attack:").width(labels_width),
             stat_bar(attack as f32 * scale),
             text(attack),
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
             text_input(&stats.attack_ev.to_string(), &stats.attack_ev.to_string())
                 .on_input(|input| Message::EVChanged(String::from("Attack"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
@@ -281,7 +342,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text("Defense:").width(labels_width),
             stat_bar(defense as f32 * scale),
             text(defense),
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
             text_input(&stats.defense_ev.to_string(), &stats.defense_ev.to_string())
                 .on_input(|input| Message::EVChanged(String::from("Defense"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
@@ -299,7 +360,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text("Sp. Atk:").width(labels_width),
             stat_bar(sp_attack as f32 * scale),
             text(sp_attack),
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
             text_input(
                 &stats.sp_attack_ev.to_string(),
                 &stats.sp_attack_ev.to_string()
@@ -323,7 +384,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text("Sp. Def:").width(labels_width),
             stat_bar(sp_defense as f32 * scale),
             text(sp_defense),
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
             text_input(
                 &stats.sp_defense_ev.to_string(),
                 &stats.sp_defense_ev.to_string()
@@ -347,7 +408,7 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
             text("Speed:").width(labels_width),
             stat_bar(speed as f32 * scale),
             text(speed),
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
             text_input(&stats.speed_ev.to_string(), &stats.speed_ev.to_string())
                 .on_input(|input| Message::EVChanged(String::from("Speed"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
@@ -368,7 +429,10 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
     container(column).width(WINDOW_WIDTH * 0.33).into()
 }
 
-fn pokemon_info_typing(typing: Option<(String, Option<String>)>) -> Element<'static, Message> {
+fn pokemon_info_typing(
+    typing: Option<(String, Option<String>)>,
+    images: &HashMap<String, image::Handle>,
+) -> Element<'static, Message> {
     match typing {
         None => container("")
             .width(WINDOW_WIDTH * 0.33)
@@ -380,14 +444,14 @@ fn pokemon_info_typing(typing: Option<(String, Option<String>)>) -> Element<'sta
             .into(),
         Some(tuple) => match tuple {
             (type1, None) => {
-                let handle1 = image::Handle::from_bytes(
-                    PROJECT_DIR
-                        .get_file(format!("Types/{}IC_SV.png", type1))
-                        .unwrap()
-                        .contents(),
-                );
-
-                let type1 = image(handle1).width((WINDOW_WIDTH * 0.33) * 0.33);
+                let type1 = image(images.get(&format!("{}IC_SV", type1)).unwrap_or({
+                    let width = 10;
+                    let height = 10;
+                    let size = (width * height) as usize;
+                    let pixels = vec![0u8; size * 4];
+                    &image::Handle::from_rgba(width, height, pixels)
+                }))
+                .width((WINDOW_WIDTH * 0.33) * 0.33);
 
                 container(row![type1].spacing(5))
                     .width(WINDOW_WIDTH * 0.33)
@@ -399,22 +463,22 @@ fn pokemon_info_typing(typing: Option<(String, Option<String>)>) -> Element<'sta
                     .into()
             }
             (type1, Some(type2)) => {
-                let handle1 = image::Handle::from_bytes(
-                    PROJECT_DIR
-                        .get_file(format!("Types/{}IC_SV.png", type1))
-                        .unwrap()
-                        .contents(),
-                );
-
-                let handle2 = image::Handle::from_bytes(
-                    PROJECT_DIR
-                        .get_file(format!("Types/{}IC_SV.png", type2))
-                        .unwrap()
-                        .contents(),
-                );
-
-                let type1 = image(handle1).width((WINDOW_WIDTH * 0.33) * 0.33);
-                let type2 = image(handle2).width((WINDOW_WIDTH * 0.33) * 0.33);
+                let type1 = image(images.get(&format!("{}IC_SV", type1)).unwrap_or({
+                    let width = 10;
+                    let height = 10;
+                    let size = (width * height) as usize;
+                    let pixels = vec![0u8; size * 4];
+                    &image::Handle::from_rgba(width, height, pixels)
+                }))
+                .width((WINDOW_WIDTH * 0.33) * 0.33);
+                let type2 = image(images.get(&format!("{}IC_SV", type2)).unwrap_or({
+                    let width = 10;
+                    let height = 10;
+                    let size = (width * height) as usize;
+                    let pixels = vec![0u8; size * 4];
+                    &image::Handle::from_rgba(width, height, pixels)
+                }))
+                .width((WINDOW_WIDTH * 0.33) * 0.33);
 
                 container(row![type1, type2].spacing(5))
                     .width(WINDOW_WIDTH * 0.33)
@@ -429,12 +493,15 @@ fn pokemon_info_typing(typing: Option<(String, Option<String>)>) -> Element<'sta
     }
 }
 
-fn info_moves(moves: Vec<(String, String, u8, u8)>) -> Element<'static, Message> {
+fn info_moves(
+    moves: Vec<(String, String, u8, u8)>,
+    images: &HashMap<String, image::Handle>,
+) -> Element<'static, Message> {
     let mut column = column![];
     let len = moves.len();
 
     for (index, (typing, name, pp_used, pp)) in moves.into_iter().enumerate() {
-        column = column.push(move_slot(index, &typing, &name, pp_used, pp));
+        column = column.push(move_slot(index, &typing, &name, pp_used, pp, images));
     }
 
     for i in 0..4_u8.saturating_sub(len as u8) {
@@ -460,8 +527,9 @@ fn info_moves(moves: Vec<(String, String, u8, u8)>) -> Element<'static, Message>
 pub fn pokemon_info<'a>(
     state: &'a iced::widget::combo_box::State<String>,
     pokemon: &Pokemon,
+    images: &HashMap<String, image::Handle>,
 ) -> Element<'a, Message> {
-    let label = info_label(pokemon);
+    let label = info_label(pokemon, images);
 
     let dex_species_lang = row![
         text(format!("No. {}", pokemon.nat_dex_number())),
@@ -473,9 +541,9 @@ pub fn pokemon_info<'a>(
         )
         .width(130)
         .input_style(text_input_default),
-        iced::widget::Space::with_width(Length::Fill),
+        iced::widget::Space::new().width(Length::Fill),
         text(pokemon.language().to_string()),
-        iced::widget::Space::with_width(45),
+        iced::widget::Space::new().width(45),
     ]
     .spacing(20)
     .align_y(Alignment::Center)
@@ -488,7 +556,7 @@ pub fn pokemon_info<'a>(
 
     let ot = container(row![row![
         text("OT Name").color(color!(0xffcc00)),
-        iced::widget::Space::with_width(10),
+        iced::widget::Space::new().width(10),
         text(pokemon.ot_name()),
     ]
     .width((WINDOW_WIDTH * 0.33) / 2.0),])
@@ -502,18 +570,19 @@ pub fn pokemon_info<'a>(
     let pid_friendship = container(row![
         row![
             text("PID").color(color!(0xffcc00)),
-            iced::widget::Space::with_width(30),
+            iced::widget::Space::new().width(30),
             text(format!("{:X}", pokemon.personality_value))
         ]
         .width((WINDOW_WIDTH * 0.33) / 2.0)
         .align_y(Alignment::Center),
         row![
             text("Friendship").color(color!(0xffcc00)),
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
             text_input(
                 &pokemon.friendship().to_string(),
                 &pokemon.friendship().to_string()
             )
+            .align_x(Horizontal::Center)
             .on_input(Message::FriendshipChanged)
             .line_height(text::LineHeight::Absolute(10.into()))
             .size(12),
@@ -529,7 +598,7 @@ pub fn pokemon_info<'a>(
     let nature_ability = container(row![
         row![
             text("Nature").color(color!(0xffcc00)),
-            iced::widget::Space::with_width(10),
+            iced::widget::Space::new().width(10),
             pick_list(
                 NATURE.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
                 Some(pokemon.nature()),
@@ -543,7 +612,7 @@ pub fn pokemon_info<'a>(
         .width((WINDOW_WIDTH * 0.33) / 2.0),
         row![
             text("Ability").color(color!(0xffcc00)),
-            iced::widget::Space::with_width(15),
+            iced::widget::Space::new().width(15),
             text(pokemon.ability()),
         ]
         .height(40.0)
@@ -559,14 +628,12 @@ pub fn pokemon_info<'a>(
 
     let item_id = item_id(&pokemon.item()).unwrap_or_default();
 
-    let item_image = if let Some(item_image) =
-        PROJECT_DIR.get_file(format!("Items/item_{:0width$}.png", item_id, width = 4))
-    {
-        let handle = image::Handle::from_bytes(item_image.contents());
-        image(handle).height(25)
-    } else {
-        image("").height(30)
-    };
+    let item_image =
+        if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
+            image(handle).height(25)
+        } else {
+            image("").height(30)
+        };
 
     let held_items = match held_items() {
         Ok(is) => is,
@@ -578,13 +645,13 @@ pub fn pokemon_info<'a>(
     let item = container(
         row![
             text("Held Item").color(color!(0xffcc00)),
-            iced::widget::Space::with_width(5),
+            iced::widget::Space::new().width(5),
             item_image,
-            iced::widget::Space::with_width(5),
+            iced::widget::Space::new().width(5),
             pick_list(held_items, Some(pokemon.item()), Message::HeldItemSelected)
                 .width(150)
                 .style(pick_list_default),
-            iced::widget::Space::with_width(Length::Fill),
+            iced::widget::Space::new().width(Length::Fill),
         ]
         .align_y(Alignment::Center),
     )
@@ -594,15 +661,15 @@ pub fn pokemon_info<'a>(
     .align_x(iced::alignment::Horizontal::Left)
     .padding([5, 15]);
 
-    let moves = info_moves(pokemon.moves());
+    let moves = info_moves(pokemon.moves(), images);
 
     container(column![
         label,
         dex_species_lang,
-        pokemon_info_typing(pokemon.typing()),
-        iced::widget::Space::with_height(10),
+        pokemon_info_typing(pokemon.typing(), images),
+        iced::widget::Space::new().width(10),
         stats(pokemon.stats, pokemon.level()),
-        iced::widget::Space::with_height(10),
+        iced::widget::Space::new().width(10),
         ot,
         pid_friendship,
         nature_ability,

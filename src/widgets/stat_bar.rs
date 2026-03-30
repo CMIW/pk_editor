@@ -1,3 +1,17 @@
+//! A colour-coded stat progress bar widget.
+//!
+//! [`StatBar`] renders a fixed-height bar whose fill colour changes based on
+//! the stat value relative to 255 (the maximum base stat in Generation III):
+//!
+//! | Range | Label | Colour |
+//! |---|---|---|
+//! | ≥ 150 | Phenomenal | `#00c2b8` |
+//! | ≥ 120 | Very Good | `#23cd5e` |
+//! | ≥ 90 | Good | `#a0e515` |
+//! | ≥ 60 | Mediocre | `#ffdd57` |
+//! | ≥ 30 | Bad | `#ff7f0f` |
+//! | < 30 | Very Bad | `#f34444` |
+
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::Tree;
@@ -45,7 +59,7 @@ where
     }
 
     fn layout(
-        &self,
+        &mut self,
         _tree: &mut Tree,
         _renderer: &Renderer,
         _limits: &layout::Limits,
@@ -83,6 +97,7 @@ where
                     radius: 5.0.into(),
                 },
                 shadow: Shadow::default(),
+                ..Default::default()
             },
             color,
         );

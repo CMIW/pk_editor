@@ -1,10 +1,20 @@
+//! Composite widget rendering the trainer's current party.
+//!
+//! Displays a labelled column of up to six [`crate::widgets::party_slot`] widgets,
+//! each showing the Pokémon's sprite, nickname, level badge, and gender badge.
+//! An empty slot renders a blank placeholder at the same size (240 × 80).
+
+use iced::advanced::image;
 use iced::advanced::widget::Id;
-use iced::widget::{column, container, row, text, vertical_rule};
+use iced::widget::{column, container, row, text};
 use iced::{Border, Color, Element, Padding};
+
+use std::collections::HashMap;
 
 use crate::message::Message;
 use crate::misc::PROJECT_DIR;
 use crate::widgets::party_slot;
+use crate::DragState;
 
 use pk_edit::save::storage::StorageType;
 use pk_edit::Pokemon;
@@ -30,9 +40,9 @@ pub fn party_label<'a>() -> Element<'a, Message> {
 
     let row = row![
         image,
-        iced::widget::Space::new(15, 40),
-        vertical_rule(1),
-        iced::widget::Space::new(35, 40),
+        iced::widget::Space::new().width(15).height(40),
+        iced::widget::rule::vertical(1),
+        iced::widget::Space::new().width(35).height(40),
         text("Current Party")
     ]
     .width(240.0)
@@ -70,26 +80,61 @@ fn default(theme: &iced::Theme) -> iced::widget::container::Style {
     }
 }
 
-pub fn party<'a>(selected: &Option<Id>, party: &[Pokemon]) -> Element<'a, Message> {
+pub fn party<'a>(
+    selected: &Option<Id>,
+    party: &'a [Pokemon],
+    images: &HashMap<String, image::Handle>,
+    drag: &Option<DragState>,
+) -> Element<'a, Message> {
     let mut col = iced::widget::Column::new().spacing(10);
 
-    for pokemon in party {
+    for (i, pokemon) in party.iter().enumerate() {
+        let id = Id::from(pokemon.offset.to_string());
         if pokemon.is_empty() {
-            col = col.push(party_slot(None).on_press(Message::Selected(
-                Some(Id::new(pokemon.offset.to_string())),
+            col = col.push(party_slot(None, None).on_press(Message::Selected(
+                Some(id),
                 Some(StorageType::Party),
                 Some(*pokemon),
             )));
         } else {
             col = col.push(
-                party_slot(Some(pokemon))
-                    .id(Id::new(pokemon.offset.to_string()))
-                    .selected(selected)
-                    .on_press(Message::Selected(
-                        Some(Id::new(pokemon.offset.to_string())),
-                        Some(StorageType::Party),
-                        Some(*pokemon),
-                    )),
+                party_slot(
+                    Some(pokemon),
+                    Some(
+                        images
+                            .get(&format!("{:0width$}", pokemon.nat_dex_number(), width = 4))
+                            .unwrap_or({
+                                let width = 10;
+                                let height = 10;
+                                let size = (width * height) as usize;
+                                let pixels = vec![0u8; size * 4];
+                                &image::Handle::from_rgba(width, height, pixels)
+                            })
+                            .clone(),
+                    ),
+                )
+                .id(id.clone())
+                .selected(selected)
+                .on_press(Message::Selected(
+                    Some(id.clone()),
+                    Some(StorageType::Party),
+                    Some(*pokemon),
+                ))
+                .in_drag_mode(drag.is_some())
+                .is_drag_source(
+                    drag.as_ref()
+                        .is_some_and(|d| d.index == i && matches!(d.storage, StorageType::Party)),
+                )
+                .on_drag_start(move |origin| {
+                    Message::DragStart(
+                        pokemon.offset,
+                        StorageType::Party,
+                        origin,
+                        pokemon.nat_dex_number(),
+                        i,
+                    )
+                })
+                .on_drop(Message::DragDrop(pokemon.offset, StorageType::Party, i)),
             );
         }
     }

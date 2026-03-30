@@ -1,18 +1,58 @@
 [package]
 name = "pk_editor"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iced = { version = "0.13.1", features = ["tokio", "advanced", "image", "svg"] }
+iced = { version = "0.14.0", features = ["tokio", "advanced", "image", "svg", "debug"] }
 tokio = { version = "1.37.0", features = ["fs"] }
 rfd = "0.14.1"
 thiserror = "2.0.9"
 include_dir = "0.7.3"
-#pk_edit = { git = "https://github.com/CMIW/pk_edit.git"}
-pk_edit = { path = "../pk_edit"}
+pk_edit = { path = "core/pk_edit"}
+widgets = {git = "https://github.com/A-Disruption/widgets.git"}
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[patch.crates-io]
+#iced = { git = "https://github.com/iced-rs/iced", branch = "master" }
 
 [build-dependencies]
 iced_fontello = "0.13"
+
+[lints.rust]
+unsafe_code = "deny" # Only if you don't need unsafe
+#missing_debug_implementations = "deny"
+#missing_docs = "warn"
+#rust_2018_idioms = "warn"
+
+[lints.clippy]
+# Safety & Error Handling
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unreachable = "deny"
+
+# Correctness & Robustness
+indexing_slicing = "deny"
+#float_arithmetic = "deny" # If precision is critical (optional)
+cast_possible_truncation = "deny"
+cast_precision_loss = "deny"
+match_wild_err_arm = "deny"
+
+# Performance
+large_futures = "warn"
+large_stack_arrays = "warn"
+redundant_clone = "deny"
+
+# Style & Clarity
+wildcard_enum_match_arm = "deny"
+unneeded_field_pattern = "deny"
+fn_params_excessive_bools = "deny"
+#must_use_candidate = "deny"
+doc_markdown = "warn"
+missing_panics_doc = "deny"
+missing_errors_doc = "deny"

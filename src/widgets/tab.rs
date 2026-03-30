@@ -1,14 +1,22 @@
+//! A selectable tab widget with a coloured status-bar indicator.
+//!
+//! [`Tab`] behaves like a button but also tracks a *selected* state and renders a
+//! 5-pixel coloured bar along its bottom edge when active. It implements the full
+//! advanced [`Widget`] trait to support custom layout, drawing, and event handling.
+//!
+//! Use [`tab`] to construct a [`Tab`], then call [`Tab::on_press`] to enable it and
+//! [`Tab::style`] to provide a custom [`StyleFn`].
+
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::widget::tree::{self, Tree};
-use iced::advanced::widget::Widget;
-use iced::advanced::widget::{Id, Operation};
+use iced::advanced::widget::{Id, Operation, Widget};
 use iced::advanced::{overlay, renderer};
 use iced::advanced::{Clipboard, Shell};
 use iced::border::Border;
+use iced::window;
+use iced::Vector;
 use iced::{mouse, touch};
-use iced::{
-    Background, Color, Element, Event, Length, Padding, Rectangle, Shadow, Size, Theme, Vector,
-};
+use iced::{Background, Color, Element, Event, Length, Padding, Rectangle, Shadow, Size, Theme};
 
 pub fn tab<'a, Message, Theme, Renderer>(
     content: impl Into<Element<'a, Message, Theme, Renderer>>,
@@ -198,59 +206,50 @@ where
     }
 
     fn layout(
-        &self,
+        &mut self,
         tree: &mut Tree,
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
         layout::padded(limits, self.width, self.height, self.padding, |limits| {
             self.content
-                .as_widget()
+                .as_widget_mut()
                 .layout(&mut tree.children[0], renderer, limits)
         })
     }
 
     fn operate(
-        &self,
+        &mut self,
         tree: &mut Tree,
         layout: Layout<'_>,
         renderer: &Renderer,
         operation: &mut dyn Operation,
     ) {
-        operation.container(None, layout.bounds(), &mut |operation| {
-            self.content.as_widget().operate(
-                &mut tree.children[0],
-                layout.children().next().unwrap(),
-                renderer,
-                operation,
-            );
-        });
+        if let Some(first_child) = tree.children.get_mut(0) {
+            operation.container(None, layout.bounds());
+
+            operation.traverse(&mut |operation| {
+                self.content.as_widget_mut().operate(
+                    first_child,
+                    layout.children().next().unwrap(),
+                    renderer,
+                    operation,
+                );
+            });
+        }
     }
 
-    fn on_event(
+    fn update(
         &mut self,
         tree: &mut Tree,
-        event: Event,
+        event: &Event,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
-        renderer: &Renderer,
-        clipboard: &mut dyn Clipboard,
+        _renderer: &Renderer,
+        _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) -> iced::event::Status {
-        if let iced::event::Status::Captured = self.content.as_widget_mut().on_event(
-            &mut tree.children[0],
-            event.clone(),
-            layout.children().next().unwrap(),
-            cursor,
-            renderer,
-            clipboard,
-            shell,
-            viewport,
-        ) {
-            return iced::event::Status::Captured;
-        }
-
+        _viewport: &Rectangle,
+    ) {
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
@@ -259,10 +258,8 @@ where
 
                     if cursor.is_over(bounds) {
                         let state = tree.state.downcast_mut::<State>();
-
                         state.is_pressed = true;
-
-                        return iced::event::Status::Captured;
+                        shell.capture_event();
                     }
                 }
             }
@@ -279,8 +276,7 @@ where
                         if cursor.is_over(bounds) {
                             shell.publish(on_press);
                         }
-
-                        return iced::event::Status::Captured;
+                        shell.capture_event();
                     }
                 }
             }
@@ -292,26 +288,9 @@ where
             _ => {}
         }
 
-        iced::event::Status::Ignored
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        _style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        let bounds = layout.bounds();
-        let content_layout = layout.children().next().unwrap();
-        let is_mouse_over = cursor.is_over(bounds);
-
-        let status = if self.on_press.is_none() {
+        let current_status = if self.on_press.is_none() {
             Status::Disabled
-        } else if is_mouse_over {
+        } else if cursor.is_over(layout.bounds()) {
             let state = tree.state.downcast_ref::<State>();
 
             if state.is_pressed {
@@ -325,51 +304,74 @@ where
             Status::Active
         };
 
-        let style = theme.style(&self.class, status);
+        if let Event::Window(window::Event::RedrawRequested(_now)) = event {
+            self.status = Some(current_status);
+        } else if self.status.is_some_and(|status| status != current_status) {
+            shell.request_redraw();
+        }
+    }
 
-        if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0 {
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        _style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        if let Some(first_child) = tree.children.first() {
+            let bounds = layout.bounds();
+            let style = theme.style(&self.class, self.status.unwrap_or(Status::Disabled));
+
+            if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0
+            {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds,
+                        border: style.border,
+                        shadow: style.shadow,
+                        ..Default::default()
+                    },
+                    style
+                        .background
+                        .unwrap_or(Background::Color(Color::TRANSPARENT)),
+                );
+            }
+
+            let viewport = if self.clip {
+                bounds.intersection(viewport).unwrap_or(*viewport)
+            } else {
+                *viewport
+            };
+
+            self.content.as_widget().draw(
+                first_child,
+                renderer,
+                theme,
+                &renderer::Style {
+                    text_color: style.text_color,
+                },
+                layout.children().next().unwrap(),
+                cursor,
+                &viewport,
+            );
+
+            let mut status_bar_bounds = bounds;
+            status_bar_bounds.height = 5.0;
+            status_bar_bounds.y = (bounds.y + bounds.height) - status_bar_bounds.height;
+
             renderer.fill_quad(
                 renderer::Quad {
-                    bounds,
-                    border: style.border,
+                    bounds: status_bar_bounds,
+                    border: style.border.rounded(20),
                     shadow: style.shadow,
+                    ..Default::default()
                 },
-                style
-                    .background
-                    .unwrap_or(Background::Color(Color::TRANSPARENT)),
+                style.status_bar_color,
             );
         }
-
-        let viewport = if self.clip {
-            bounds.intersection(viewport).unwrap_or(*viewport)
-        } else {
-            *viewport
-        };
-
-        self.content.as_widget().draw(
-            &tree.children[0],
-            renderer,
-            theme,
-            &renderer::Style {
-                text_color: style.text_color,
-            },
-            content_layout,
-            cursor,
-            &viewport,
-        );
-
-        let mut status_bar_bounds = bounds;
-        status_bar_bounds.height = 5.0;
-        status_bar_bounds.y = (bounds.y + bounds.height) - status_bar_bounds.height;
-
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: status_bar_bounds,
-                border: style.border.rounded(20),
-                shadow: style.shadow,
-            },
-            style.status_bar_color,
-        );
     }
 
     fn mouse_interaction(
@@ -392,16 +394,22 @@ where
     fn overlay<'b>(
         &'b mut self,
         tree: &'b mut Tree,
-        layout: Layout<'_>,
+        layout: Layout<'b>,
         renderer: &Renderer,
+        viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        self.content.as_widget_mut().overlay(
-            &mut tree.children[0],
-            layout.children().next().unwrap(),
-            renderer,
-            translation,
-        )
+        if let Some(first_child) = tree.children.get_mut(0) {
+            self.content.as_widget_mut().overlay(
+                first_child,
+                layout.children().next().unwrap(),
+                renderer,
+                viewport,
+                translation,
+            )
+        } else {
+            None
+        }
     }
 }
 
