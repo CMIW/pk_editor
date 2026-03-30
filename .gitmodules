@@ -1,0 +1,3 @@
+[submodule "core/pk_edit"]
+	path = core/pk_edit
+	url = https://github.com/CMIW/pk_edit.git
