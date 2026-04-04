@@ -21,9 +21,7 @@ use crate::pick_list_default;
 use crate::widgets::item_counter;
 use crate::{shadow_box_light, tab_bar_tab};
 
-use pk_edit::misc::{balls, berries, item_id, items, key_items, tms};
-use pk_edit::save::storage::Pocket;
-use pk_edit::SaveFile;
+use pk_edit::{Gen3GameData, Gen3Pocket as Pocket, Gen3SaveFile};
 
 use crate::menu_bar;
 use crate::menu_bar_default;
@@ -49,7 +47,7 @@ pub fn update(
     item_bag: &mut [(String, u16)],
     ball_bag: &mut [(String, u16)],
     berry_bag: &mut [(String, u16)],
-    save_file: &mut SaveFile,
+    save_file: &mut Gen3SaveFile,
     selected_bag: &mut Option<Id>,
     message: Message,
 ) -> Result<(), SaveDataError> {
@@ -262,15 +260,10 @@ fn items_bag<'a>(
 ) -> Element<'a, Message> {
     let mut column = column![].spacing(10);
 
-    let items = match items() {
-        Ok(is) => is,
-        Err(_) => {
-            vec![String::from("")]
-        }
-    };
+    let items = Gen3GameData.pocket_items(Pocket::Items).unwrap_or_default();
 
     for (i, (item, quantity)) in bag.iter().enumerate() {
-        let item_id = item_id(item).unwrap_or_default();
+        let item_id = Gen3GameData.item_sprite_id(item).unwrap_or_default();
         let item_image =
             if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
                 image(handle).height(40)
@@ -314,15 +307,12 @@ fn balls_bag<'a>(
 ) -> Element<'a, Message> {
     let mut column = column![].spacing(10);
 
-    let balls = match balls() {
-        Ok(ms) => ms,
-        Err(_) => {
-            vec![String::from("")]
-        }
-    };
+    let balls = Gen3GameData
+        .pocket_items(Pocket::Pokeballs)
+        .unwrap_or_default();
 
     for (i, (item, quantity)) in bag.iter().enumerate() {
-        let item_id = item_id(item).unwrap_or_default();
+        let item_id = Gen3GameData.item_sprite_id(item).unwrap_or_default();
 
         let item_image =
             if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
@@ -367,15 +357,12 @@ fn berries_bag<'a>(
 ) -> Element<'a, Message> {
     let mut column = column![].spacing(10);
 
-    let berries = match berries() {
-        Ok(ms) => ms,
-        Err(_) => {
-            vec![String::from("")]
-        }
-    };
+    let berries = Gen3GameData
+        .pocket_items(Pocket::Berries)
+        .unwrap_or_default();
 
     for (i, (item, quantity)) in bag.iter().enumerate() {
-        let item_id = item_id(item).unwrap_or_default();
+        let item_id = Gen3GameData.item_sprite_id(item).unwrap_or_default();
 
         let item_image =
             if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
@@ -420,15 +407,10 @@ fn tms_bag<'a>(
 ) -> Element<'a, Message> {
     let mut column = column![].spacing(10);
 
-    let tms = match tms() {
-        Ok(ms) => ms,
-        Err(_) => {
-            vec![String::from("")]
-        }
-    };
+    let tms = Gen3GameData.pocket_items(Pocket::Tms).unwrap_or_default();
 
     for (i, (item, quantity)) in bag.iter().enumerate() {
-        let item_id = item_id(item).unwrap_or_default();
+        let item_id = Gen3GameData.item_sprite_id(item).unwrap_or_default();
 
         let item_image =
             if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
@@ -473,15 +455,10 @@ fn keys_bag<'a>(
 ) -> Element<'a, Message> {
     let mut column = column![].spacing(10);
 
-    let key_items = match key_items() {
-        Ok(ms) => ms,
-        Err(_) => {
-            vec![String::from("")]
-        }
-    };
+    let key_items = Gen3GameData.pocket_items(Pocket::Key).unwrap_or_default();
 
     for (i, (item, _)) in bag.iter().enumerate() {
-        let item_id = item_id(item).unwrap_or_default();
+        let item_id = Gen3GameData.item_sprite_id(item).unwrap_or_default();
 
         let item_image =
             if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {

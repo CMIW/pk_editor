@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-04
+
+### Added
+
+#### `pk_edit`
+
+- `OpenSave` enum replaces `SaveFile` as the public save-file handle, enabling dispatch across multiple game generations
+- `pk_edit::open()` top-level entry point returns `OpenSave` from raw save bytes
+- `AnyPokemon` type alias / enum replaces the concrete `Pokemon` type throughout the public API
+- `PokemonTrait` trait for generation-agnostic Pokémon access
+- `GameData` / `AnyGameData` trait for generation-aware game metadata
+- `ComputedStats` struct holding fully computed stat values at a given level
+- `StatBlock` struct holding raw IV/EV values per stat (replaces flat fields on `Stats`)
+- `AnyGameData::species()` — load species name list from the active game's data
+- `AnyGameData::balls_sprite_ids()` — load Pokéball sprite ID list (replaces hardcoded `balls_id()`)
+- `PokemonTrait::update_iv()` / `update_ev()` — replace `Stats::update_ivs()` / `update_evs()`
+- `Gen3Pocket` type alias exported for pocket selection in Gen III saves
+
+#### `pk_editor`
+
+- `State::save_file` changed from `SaveFile` to `Option<OpenSave>` — no save is held on startup
+- Species combo-box populated lazily from `save_file.game_data().species()` on file open
+- Move slots receive full move list via `game_data` for in-slot move selection UI
+- `DragStart` message variant drops the cursor-offset parameter (simplified drag state)
+- `DragDrop` message variant drops the redundant first parameter
+
+### Changed
+
+#### `pk_edit`
+
+- `Pokemon::set_item()` renamed to `set_held_item()`
+- `Stats::update_ivs()` / `update_evs()` superseded by `PokemonTrait::update_iv()` / `update_ev()`
+- `Stats::highest_stat()` removed; stat maximum computed directly from `ComputedStats` fields
+- `StorageType` re-exported from `pk_edit` crate root (previously `pk_edit::save::storage::StorageType`)
+
+#### `pk_editor`
+
+- All `expect("REASON")` / `unwrap()` call-sites replaced with proper `?` propagation or `unwrap_or_default()`
+- `bag::update()` now receives `&mut Gen3SaveFile` directly instead of the opaque `SaveFile`
+- `pokemon_info::update()` now receives a `pokemon_factory` and explicit OT fields instead of `&SaveFile`
+- `info_label()` and `stats()` view helpers updated to accept `AnyPokemon` + `AnyGameData`
+- `State::party` / `current_pc` initialised as empty `Vec` (no dummy defaults on startup)
+
 ## [0.3.0] - 2026-03-29
 
 ### Added

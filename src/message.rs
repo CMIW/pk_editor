@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use pk_edit::pokemon::Pokemon;
-use pk_edit::save::storage::StorageType;
+use pk_edit::AnyPokemon;
+use pk_edit::StorageType;
 
 use crate::bag;
 use crate::error::Error;
@@ -48,12 +48,14 @@ pub enum Message {
     FileOpened(Result<PathBuf, Error>),
     /// Result of reading the raw bytes of a save file from disk.
     LoadFile(Result<Arc<Vec<u8>>, Error>),
-    /// A Pokémon slot was selected. Carries the widget [`Id`], [`StorageType`], and the [`Pokemon`].
-    Selected(Option<Id>, Option<StorageType>, Option<Pokemon>),
+    /// A Pokémon slot was selected. Carries the widget [`Id`], [`StorageType`], and the [`AnyPokemon`].
+    Selected(Option<Id>, Option<StorageType>, Option<AnyPokemon>),
     /// Result of loading all sprite and icon images from the embedded asset directory.
     ImagesListed(Result<HashMap<String, image::Handle>, Error>),
-    DragStart(usize, StorageType, Point, u16, usize),
+    /// A drag gesture started on a slot. Carries storage type, cursor origin, National Dex number, and slot index.
+    DragStart(StorageType, Point, u16, usize),
     DragMoved(Point),
     DragReleased,
-    DragDrop(usize, StorageType, usize),
+    /// A drag gesture was released on a target slot. Carries target storage type and target slot index.
+    DragDrop(StorageType, usize),
 }

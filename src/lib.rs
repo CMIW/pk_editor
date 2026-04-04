@@ -14,7 +14,7 @@ pub use widgets::*;
 
 use iced::widget::image;
 use iced::Point;
-use pk_edit::save::storage::StorageType;
+use pk_edit::StorageType;
 
 /// Holds the state of an in-progress drag operation.
 #[derive(Debug)]

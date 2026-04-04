@@ -16,8 +16,7 @@ use crate::misc::PROJECT_DIR;
 use crate::widgets::party_slot;
 use crate::DragState;
 
-use pk_edit::save::storage::StorageType;
-use pk_edit::Pokemon;
+use pk_edit::{AnyPokemon, PokemonTrait, StorageType};
 
 pub fn party_label<'a>() -> Element<'a, Message> {
     let handle = iced::widget::svg::Handle::from_memory(
@@ -82,60 +81,66 @@ fn default(theme: &iced::Theme) -> iced::widget::container::Style {
 
 pub fn party<'a>(
     selected: &Option<Id>,
-    party: &'a [Pokemon],
+    party: &'a [AnyPokemon],
     images: &HashMap<String, image::Handle>,
     drag: &Option<DragState>,
 ) -> Element<'a, Message> {
     let mut col = iced::widget::Column::new().spacing(10);
 
-    for (i, pokemon) in party.iter().enumerate() {
-        let id = Id::from(pokemon.offset.to_string());
-        if pokemon.is_empty() {
-            col = col.push(party_slot(None, None).on_press(Message::Selected(
-                Some(id),
-                Some(StorageType::Party),
-                Some(*pokemon),
-            )));
-        } else {
-            col = col.push(
-                party_slot(
-                    Some(pokemon),
-                    Some(
-                        images
-                            .get(&format!("{:0width$}", pokemon.nat_dex_number(), width = 4))
-                            .unwrap_or({
-                                let width = 10;
-                                let height = 10;
-                                let size = (width * height) as usize;
-                                let pixels = vec![0u8; size * 4];
-                                &image::Handle::from_rgba(width, height, pixels)
-                            })
-                            .clone(),
-                    ),
-                )
-                .id(id.clone())
-                .selected(selected)
-                .on_press(Message::Selected(
-                    Some(id.clone()),
-                    Some(StorageType::Party),
-                    Some(*pokemon),
-                ))
-                .in_drag_mode(drag.is_some())
-                .is_drag_source(
-                    drag.as_ref()
-                        .is_some_and(|d| d.index == i && matches!(d.storage, StorageType::Party)),
-                )
-                .on_drag_start(move |origin| {
-                    Message::DragStart(
-                        pokemon.offset,
-                        StorageType::Party,
-                        origin,
-                        pokemon.nat_dex_number(),
-                        i,
+    for i in 0..6 {
+        let id = Id::from(format!("party_{}", i));
+        match party.get(i) {
+            Some(pokemon) if !pokemon.is_empty() => {
+                col = col.push(
+                    party_slot(
+                        Some(pokemon),
+                        Some(
+                            images
+                                .get(&format!("{:0width$}", pokemon.nat_dex_number(), width = 4))
+                                .unwrap_or({
+                                    let width = 10;
+                                    let height = 10;
+                                    let size = (width * height) as usize;
+                                    let pixels = vec![0u8; size * 4];
+                                    &image::Handle::from_rgba(width, height, pixels)
+                                })
+                                .clone(),
+                        ),
                     )
-                })
-                .on_drop(Message::DragDrop(pokemon.offset, StorageType::Party, i)),
-            );
+                    .id(id.clone())
+                    .selected(selected)
+                    .on_press(Message::Selected(
+                        Some(id.clone()),
+                        Some(StorageType::Party),
+                        Some(*pokemon),
+                    ))
+                    .in_drag_mode(drag.is_some())
+                    .is_drag_source(
+                        drag.as_ref().is_some_and(|d| {
+                            d.index == i && matches!(d.storage, StorageType::Party)
+                        }),
+                    )
+                    .on_drag_start(move |origin| {
+                        Message::DragStart(StorageType::Party, origin, pokemon.nat_dex_number(), i)
+                    })
+                    .on_drop(Message::DragDrop(StorageType::Party, i)),
+                );
+            }
+            Some(pokemon) => {
+                col = col.push(
+                    party_slot(None, None)
+                        .on_press(Message::Selected(
+                            Some(id),
+                            Some(StorageType::Party),
+                            Some(*pokemon),
+                        ))
+                        .in_drag_mode(drag.is_some())
+                        .on_drop(Message::DragDrop(StorageType::Party, i)),
+                );
+            }
+            None => {
+                col = col.push(party_slot(None, None).in_drag_mode(drag.is_some()));
+            }
         }
     }
 

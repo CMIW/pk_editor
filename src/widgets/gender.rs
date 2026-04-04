@@ -14,10 +14,10 @@ use iced::widget::text;
 use iced::{color, mouse};
 use iced::{Background, Color, Element, Length, Rectangle, Shadow, Size, Theme};
 
-use pk_edit::pokemon;
+use pk_edit::Gender as PkGender;
 
 pub fn gender<'a, Message: 'a, Theme, Renderer>(
-    gender: pokemon::Gender,
+    gender: PkGender,
 ) -> Gender<'a, Message, Theme, Renderer>
 where
     Theme: Catalog + iced::widget::text::Catalog + 'a,
@@ -33,7 +33,7 @@ where
 {
     width: f32,
     height: f32,
-    gender: pokemon::Gender,
+    gender: PkGender,
     class: Theme::Class<'a>,
     content: Element<'a, Message, Theme, Renderer>,
 }
@@ -43,11 +43,11 @@ where
     Theme: Catalog + iced::widget::text::Catalog + 'a,
     Renderer: renderer::Renderer + iced::advanced::text::Renderer + 'a,
 {
-    pub fn new(gender: pokemon::Gender) -> Self {
+    pub fn new(gender: PkGender) -> Self {
         let content = match gender {
-            pokemon::Gender::None => text("").into(),
-            pokemon::Gender::F => text("♀").shaping(text::Shaping::Advanced).into(),
-            pokemon::Gender::M => text("♂").shaping(text::Shaping::Advanced).into(),
+            PkGender::None => text("").into(),
+            PkGender::F => text("♀").shaping(text::Shaping::Advanced).into(),
+            PkGender::M => text("♂").shaping(text::Shaping::Advanced).into(),
         };
 
         Self {
@@ -112,9 +112,9 @@ where
         let w_style = theme.style(&self.class);
 
         let background = match self.gender {
-            pokemon::Gender::None => Some(Background::Color(Color::TRANSPARENT)),
-            pokemon::Gender::F => w_style.female,
-            pokemon::Gender::M => w_style.male,
+            PkGender::None => Some(Background::Color(Color::TRANSPARENT)),
+            PkGender::F => w_style.female,
+            PkGender::M => w_style.male,
         };
 
         renderer.fill_quad(

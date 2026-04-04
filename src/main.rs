@@ -21,10 +21,7 @@ use pk_editor::DragState;
 use pk_editor::{bag, icon, party_box};
 
 use pk_edit::misc::extract_db;
-use pk_edit::pokemon::Pokemon;
-use pk_edit::save::storage::Pocket;
-use pk_edit::save::storage::StorageType;
-use pk_edit::SaveFile;
+use pk_edit::{AnyPokemon, GameData, Gen3Pocket as Pocket, OpenSave, PokemonTrait, StorageType};
 use pk_editor::menu_bar;
 use pk_editor::pokemon_info;
 
@@ -50,16 +47,16 @@ pub struct State {
     theme: Theme,
     show_modal: bool,
     drag: Option<DragState>,
-    save_file: SaveFile,
-    party: Vec<Pokemon>,
+    save_file: Option<OpenSave>,
+    party: Vec<AnyPokemon>,
     selected: Option<Id>,
     error: Option<Error>,
     screen: Option<Screen>,
     current_pc_index: usize,
     selected_tab: Option<Id>,
     selected_bag: Option<Id>,
-    current_pc: Vec<Pokemon>,
-    selected_pokemon: Option<Pokemon>,
+    current_pc: Vec<AnyPokemon>,
+    selected_pokemon: Option<AnyPokemon>,
     tm_bag: Vec<(String, u16)>,
     key_bag: Vec<(String, u16)>,
     item_bag: Vec<(String, u16)>,
@@ -78,15 +75,6 @@ pub enum Screen {
 
 impl State {
     fn new() -> (Self, Task<Message>) {
-        use pk_edit::misc::species;
-
-        let species = match species() {
-            Ok(sps) => sps,
-            Err(_) => {
-                vec![String::from("")]
-            }
-        };
-
         (
             State {
                 error: None,
@@ -101,15 +89,14 @@ impl State {
                 current_pc_index: 0,
                 selected_pokemon: None,
                 theme: iced::Theme::Dracula,
-                save_file: SaveFile::default(),
+                save_file: None,
                 selected_tab: Some(Id::new("1")),
                 selected_bag: Some(Id::new("1")),
                 screen: Some(Screen::PartyBoxes),
-                //screen: None,
-                party: vec![Pokemon::default(); 6],
-                current_pc: vec![Pokemon::default(); 30],
+                party: vec![],
+                current_pc: vec![],
                 selected_pokemon_storage: StorageType::None,
-                cb_state: iced::widget::combo_box::State::new(species),
+                cb_state: iced::widget::combo_box::State::new(vec![]),
                 images: HashMap::new(),
             },
             Task::perform(load_images(), Message::ImagesListed),
@@ -155,30 +142,38 @@ impl State {
                 }
             },
             Message::Bag(message) => {
-                if let Err(error) = bag::update(
-                    &mut self.tm_bag,
-                    &mut self.key_bag,
-                    &mut self.item_bag,
-                    &mut self.ball_bag,
-                    &mut self.berry_bag,
-                    &mut self.save_file,
-                    &mut self.selected_bag,
-                    message,
-                ) {
-                    let error_msg = error.to_string();
-                    return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                if let Some(OpenSave::Gen3(ref mut gen3)) = self.save_file {
+                    if let Err(error) = bag::update(
+                        &mut self.tm_bag,
+                        &mut self.key_bag,
+                        &mut self.item_bag,
+                        &mut self.ball_bag,
+                        &mut self.berry_bag,
+                        gen3,
+                        &mut self.selected_bag,
+                        message,
+                    ) {
+                        let error_msg = error.to_string();
+                        return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                    }
                 }
                 self.update(Message::UpdateChanges)
             }
             Message::PokemonInfo(message) => {
-                if let Err(error) = pokemon_info::update(
-                    &mut self.selected_pokemon,
-                    &self.save_file.ot_name(),
-                    &self.save_file.ot_id(),
-                    message,
-                ) {
-                    let error_msg = error.to_string();
-                    return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                if let Some(ref save_file) = self.save_file {
+                    let factory = save_file.pokemon_factory();
+                    let ot_name = save_file.trainer_name();
+                    let ot_id = save_file.trainer_id();
+                    if let Err(error) = pokemon_info::update(
+                        &mut self.selected_pokemon,
+                        &factory,
+                        &ot_name,
+                        ot_id,
+                        message,
+                    ) {
+                        let error_msg = error.to_string();
+                        return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                    }
                 }
                 self.update(Message::UpdateChanges)
             }
@@ -194,9 +189,9 @@ impl State {
                 Task::none()
             }
             Message::FileSaved(Ok(path)) => {
-                if !self.save_file.is_empty() {
+                if let Some(ref save_file) = self.save_file {
                     Task::perform(
-                        write_file(path, Some(Arc::new(self.save_file.raw_data()))),
+                        write_file(path, Some(Arc::new(save_file.raw_data()))),
                         Message::WriteFile,
                     )
                 } else {
@@ -220,8 +215,19 @@ impl State {
                 self.berry_bag = vec![];
                 self.current_pc_index = 0;
                 self.selected_pokemon = None;
-                self.save_file = SaveFile::new(&results);
                 self.selected_pokemon_storage = StorageType::None;
+
+                match pk_edit::open(&results) {
+                    Ok(save_file) => {
+                        let species = save_file.game_data().species().unwrap_or_default();
+                        self.cb_state = iced::widget::combo_box::State::new(species);
+                        self.save_file = Some(save_file);
+                    }
+                    Err(error) => {
+                        let error_msg = error.to_string();
+                        return Task::perform(save_error_dialog(error_msg), |_| Message::HideModal);
+                    }
+                }
 
                 self.update(Message::UpdateChanges)
             }
@@ -237,10 +243,13 @@ impl State {
                 Task::perform(save_error_dialog(error_msg), |_| Message::HideModal)
             }
             Message::UpdateChanges => {
-                if let Some(mut selected_pokemon) = &self.selected_pokemon {
+                let Some(ref mut save_file) = self.save_file else {
+                    return Task::none();
+                };
+
+                if let Some(mut selected_pokemon) = self.selected_pokemon {
                     selected_pokemon.update_checksum();
-                    if let Err(error) = self
-                        .save_file
+                    if let Err(error) = save_file
                         .save_pokemon(self.selected_pokemon_storage, selected_pokemon)
                     {
                         let error_msg = error.to_string();
@@ -248,16 +257,13 @@ impl State {
                     }
                 }
 
-                self.party = self.save_file.get_party().expect("REASON");
-                self.current_pc = self
-                    .save_file
-                    .pc_box(self.current_pc_index)
-                    .expect("REASON");
-                self.item_bag = self.save_file.pocket(Pocket::Items).expect("REASON");
-                self.ball_bag = self.save_file.pocket(Pocket::Pokeballs).expect("REASON");
-                self.berry_bag = self.save_file.pocket(Pocket::Berries).expect("REASON");
-                self.tm_bag = self.save_file.pocket(Pocket::Tms).expect("REASON");
-                self.key_bag = self.save_file.pocket(Pocket::Key).expect("REASON");
+                self.party = save_file.party().unwrap_or_default();
+                self.current_pc = save_file.pc_box(self.current_pc_index).unwrap_or_default();
+                self.item_bag = save_file.pocket(Pocket::Items).unwrap_or_default();
+                self.ball_bag = save_file.pocket(Pocket::Pokeballs).unwrap_or_default();
+                self.berry_bag = save_file.pocket(Pocket::Berries).unwrap_or_default();
+                self.tm_bag = save_file.pocket(Pocket::Tms).unwrap_or_default();
+                self.key_bag = save_file.pocket(Pocket::Key).unwrap_or_default();
 
                 Task::none()
             }
@@ -270,7 +276,7 @@ impl State {
                 Task::none()
             }
             Message::Increment => {
-                if !self.save_file.is_pc_empty() {
+                if self.save_file.as_ref().is_some_and(|s| !s.is_pc_empty()) {
                     if self.current_pc_index < 13 {
                         self.current_pc_index += 1;
                     } else {
@@ -282,7 +288,7 @@ impl State {
                 }
             }
             Message::Decrement => {
-                if !self.save_file.is_pc_empty() {
+                if self.save_file.as_ref().is_some_and(|s| !s.is_pc_empty()) {
                     if self.current_pc_index > 0 {
                         self.current_pc_index -= 1;
                     } else {
@@ -293,8 +299,8 @@ impl State {
                     Task::none()
                 }
             }
-            Message::DragStart(offset, storage, origin, nat_dex_number, i) => {
-                tracing::debug!(?storage, offset, i, "DragStart");
+            Message::DragStart(storage, origin, nat_dex_number, i) => {
+                tracing::debug!(?storage, i, "DragStart");
                 let handle = self
                     .images
                     .get(&format!("{:0width$}", nat_dex_number, width = 4))
@@ -321,24 +327,36 @@ impl State {
                 }
                 Task::none()
             }
-            Message::DragDrop(_, to_storage, to_index) => {
+            Message::DragDrop(to_storage, to_index) => {
                 tracing::debug!(?to_storage, to_index, "DragDrop");
                 if let Some(from) = self.drag.take() {
                     let from_pokemon = match from.storage {
-                        StorageType::PC => self.current_pc[from.index],
-                        StorageType::Party => self.party[from.index],
-                        StorageType::None => return Task::none(),
+                        StorageType::PC => self.current_pc.get(from.index).copied(),
+                        StorageType::Party => self.party.get(from.index).copied(),
+                        StorageType::None => None,
                     };
                     let to_pokemon = match to_storage {
-                        StorageType::PC => self.current_pc[to_index],
-                        StorageType::Party => self.party[to_index],
-                        StorageType::None => return Task::none(),
+                        StorageType::PC => self.current_pc.get(to_index).copied(),
+                        StorageType::Party => self.party.get(to_index).copied(),
+                        StorageType::None => None,
                     };
-                    self.save_file
-                        .swap_pokemon(from_pokemon, from.storage, to_pokemon, to_storage)
-                        .expect("REASON");
-
-                    return self.update(Message::UpdateChanges);
+                    if let (Some(from_pokemon), Some(to_pokemon), Some(ref mut save_file)) =
+                        (from_pokemon, to_pokemon, self.save_file.as_mut())
+                    {
+                        if let Err(error) = save_file.swap_pokemon(
+                            from_pokemon,
+                            from.storage,
+                            to_pokemon,
+                            to_storage,
+                        ) {
+                            let error_msg = error.to_string();
+                            return Task::perform(
+                                save_error_dialog(error_msg),
+                                |_| Message::HideModal,
+                            );
+                        }
+                        return self.update(Message::UpdateChanges);
+                    }
                 }
                 Task::none()
             }
@@ -351,7 +369,7 @@ impl State {
                 }
                 Task::none()
             }
-            Message::Loaded(_) => todo!(), //_ => Task::none(),
+            Message::Loaded(_) => todo!(),
             Message::HideModal => {
                 self.show_modal = false;
                 Task::none()
@@ -361,12 +379,19 @@ impl State {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let game_data = self
+            .save_file
+            .as_ref()
+            .map(|s| s.game_data())
+            .unwrap_or_default();
+
         let content = container(match self.screen {
             Some(Screen::PartyBoxes) => party_box(
                 &self.cb_state,
                 &self.selected,
                 &self.selected_tab,
                 &self.selected_pokemon,
+                &game_data,
                 &self.party,
                 &self.current_pc_index,
                 &self.current_pc,
@@ -409,7 +434,6 @@ impl State {
                 .height(WINDOW_HEIGHT)
                 .into()
         } else if let Some(drag) = &self.drag {
-            //let offset = drag.cursor - drag.origin;
             iced::widget::stack![
                 content,
                 iced::widget::float(image(drag.handle.clone()).width(80).height(80)).translate(

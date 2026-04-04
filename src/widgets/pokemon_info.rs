@@ -24,7 +24,10 @@ use iced::widget::{
 };
 use iced::{Alignment, Element, Length};
 use pk_edit::error::PokemonError;
-use pk_edit::misc::balls_id;
+use pk_edit::{
+    AnyFactory, AnyGameData, AnyPokemon, ComputedStats, GameData, PokemonFactoryTrait,
+    PokemonTrait, Pokerus, StatBlock, TrainerID, NATURE,
+};
 use widgets::generic_overlay::dropdown_root;
 
 use std::collections::HashMap;
@@ -32,11 +35,6 @@ use std::collections::HashMap;
 use crate::misc::{WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokeball_picker_apperance, pokemon_info_appearance};
 use crate::widgets::input_level;
-
-use pk_edit::misc::{held_items, item_id, NATURE};
-use pk_edit::pokemon::gen_pokemon_from_species;
-use pk_edit::pokemon::{Pokerus, Stats};
-use pk_edit::Pokemon;
 
 use crate::stat_bar;
 use crate::widgets::gender;
@@ -59,9 +57,10 @@ pub enum Message {
 }
 
 pub fn update(
-    selected_pokemon: &mut Option<Pokemon>,
-    ot_name: &[u8],
-    ot_id: &[u8],
+    selected_pokemon: &mut Option<AnyPokemon>,
+    factory: &AnyFactory,
+    ot_name: &str,
+    ot_id: TrainerID,
     message: Message,
 ) -> Result<(), PokemonError> {
     match message {
@@ -99,7 +98,7 @@ pub fn update(
                     } else {
                         number as u8
                     };
-                    selected_pokemon.set_level(value);
+                    selected_pokemon.set_level(value)?;
                 }
             }
             Ok(())
@@ -108,7 +107,7 @@ pub fn update(
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 if selected_pokemon.is_empty() {
                     *selected_pokemon =
-                        gen_pokemon_from_species(*selected_pokemon, &species, ot_name, ot_id)?;
+                        factory.gen_pokemon_from_species(&species, ot_name, ot_id)?;
                 } else {
                     selected_pokemon.set_species(&species)?;
                 }
@@ -119,9 +118,9 @@ pub fn update(
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 value.retain(|c| c.is_numeric());
                 if let Ok(number) = value.parse::<u16>() {
-                    selected_pokemon.stats_mut().update_ivs(&iv, number);
+                    selected_pokemon.update_iv(&iv, number);
                 } else if value.is_empty() {
-                    selected_pokemon.stats_mut().update_ivs(&iv, 0);
+                    selected_pokemon.update_iv(&iv, 0);
                 }
             }
             Ok(())
@@ -130,9 +129,9 @@ pub fn update(
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 value.retain(|c| c.is_numeric());
                 if let Ok(number) = value.parse::<u16>() {
-                    selected_pokemon.stats_mut().update_evs(&ev, number);
+                    selected_pokemon.update_ev(&ev, number);
                 } else if value.is_empty() {
-                    selected_pokemon.stats_mut().update_evs(&ev, 0);
+                    selected_pokemon.update_ev(&ev, 0);
                 }
             }
             Ok(())
@@ -146,14 +145,14 @@ pub fn update(
                     } else {
                         number as u8
                     };
-                    selected_pokemon.set_friendship(value);
+                    selected_pokemon.set_friendship(value)?;
                 }
             }
             Ok(())
         }
         Message::HeldItemSelected(item) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
-                selected_pokemon.set_item(&item)?;
+                selected_pokemon.set_held_item(&item)?;
             }
             Ok(())
         }
@@ -171,7 +170,7 @@ pub fn update(
         }
         Message::NatureSelected(nature) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
-                selected_pokemon.set_nature(&nature);
+                selected_pokemon.set_nature(&nature)?;
             }
             Ok(())
         }
@@ -179,7 +178,8 @@ pub fn update(
 }
 
 fn info_label(
-    pokemon: &Pokemon,
+    pokemon: &AnyPokemon,
+    game_data: &AnyGameData,
     images: &HashMap<String, image::Handle>,
 ) -> Element<'static, Message> {
     let pokeball = if pokemon.pokeball_caught() == 0 {
@@ -204,20 +204,24 @@ fn info_label(
                         &image::Handle::from_rgba(width, height, pixels)
                     }),
             ),
-            scrollable(column(balls_id().unwrap_or_default().iter().filter_map(
-                |x| {
-                    Some(
-                        button(
-                            image(images.get(&format!("item_{:0width$}", *x, width = 4))?)
-                                .width(45)
-                                .height(45),
+            scrollable(column(
+                game_data
+                    .balls_sprite_ids()
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|x| {
+                        Some(
+                            button(
+                                image(images.get(&format!("item_{:0width$}", *x, width = 4))?)
+                                    .width(45)
+                                    .height(45),
+                            )
+                            .on_press(Message::ChangePokeball(*x as u8))
+                            .style(button::subtle)
+                            .into(),
                         )
-                        .on_press(Message::ChangePokeball(*x as u8))
-                        .style(button::subtle)
-                        .into(),
-                    )
-                },
-            )))
+                    }),
+            ))
             .height(Length::Fixed(270.0)),
         )
         .overlay_width(Length::Shrink)
@@ -282,15 +286,20 @@ fn info_label(
         .into()
 }
 
-fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
-    let (_, highest_stat) = stats.highest_stat(level);
+fn stats(computed: ComputedStats, ivs: StatBlock, evs: StatBlock) -> Element<'static, Message> {
+    let highest_stat = [
+        computed.hp,
+        computed.attack,
+        computed.defense,
+        computed.sp_attack,
+        computed.sp_defense,
+        computed.speed,
+    ]
+    .iter()
+    .copied()
+    .max()
+    .unwrap_or(1);
     let scale = if highest_stat >= 400 { 0.23 } else { 0.45 };
-    let hp = stats.hp(level);
-    let attack = stats.attack(level);
-    let defense = stats.defense(level);
-    let sp_attack = stats.sp_attack(level);
-    let sp_defense = stats.sp_defense(level);
-    let speed = stats.speed(level);
     let labels_width = 70;
     let ev_iv_width = 30;
 
@@ -304,15 +313,15 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
         .align_y(Alignment::Center),
         row![
             text("HP:").width(labels_width),
-            stat_bar(hp as f32 * scale),
-            text(hp),
+            stat_bar(computed.hp as f32 * scale),
+            text(computed.hp),
             iced::widget::Space::new().width(Length::Fill),
-            text_input(&stats.hp_ev.to_string(), &stats.hp_ev.to_string())
+            text_input(&evs.hp.to_string(), &evs.hp.to_string())
                 .on_input(|input| Message::EVChanged(String::from("HP"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text_input(&stats.hp_iv.to_string(), &stats.hp_iv.to_string())
+            text_input(&ivs.hp.to_string(), &ivs.hp.to_string())
                 .on_input(|input| Message::IVChanged(String::from("HP"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(30)
@@ -322,15 +331,15 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
         .align_y(Alignment::Center),
         row![
             text("Attack:").width(labels_width),
-            stat_bar(attack as f32 * scale),
-            text(attack),
+            stat_bar(computed.attack as f32 * scale),
+            text(computed.attack),
             iced::widget::Space::new().width(Length::Fill),
-            text_input(&stats.attack_ev.to_string(), &stats.attack_ev.to_string())
+            text_input(&evs.attack.to_string(), &evs.attack.to_string())
                 .on_input(|input| Message::EVChanged(String::from("Attack"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text_input(&stats.attack_iv.to_string(), &stats.attack_iv.to_string())
+            text_input(&ivs.attack.to_string(), &ivs.attack.to_string())
                 .on_input(|input| Message::IVChanged(String::from("Attack"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(30)
@@ -340,15 +349,15 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
         .align_y(Alignment::Center),
         row![
             text("Defense:").width(labels_width),
-            stat_bar(defense as f32 * scale),
-            text(defense),
+            stat_bar(computed.defense as f32 * scale),
+            text(computed.defense),
             iced::widget::Space::new().width(Length::Fill),
-            text_input(&stats.defense_ev.to_string(), &stats.defense_ev.to_string())
+            text_input(&evs.defense.to_string(), &evs.defense.to_string())
                 .on_input(|input| Message::EVChanged(String::from("Defense"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text_input(&stats.defense_iv.to_string(), &stats.defense_iv.to_string())
+            text_input(&ivs.defense.to_string(), &ivs.defense.to_string())
                 .on_input(|input| Message::IVChanged(String::from("Defense"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(30)
@@ -358,20 +367,20 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
         .align_y(Alignment::Center),
         row![
             text("Sp. Atk:").width(labels_width),
-            stat_bar(sp_attack as f32 * scale),
-            text(sp_attack),
+            stat_bar(computed.sp_attack as f32 * scale),
+            text(computed.sp_attack),
             iced::widget::Space::new().width(Length::Fill),
             text_input(
-                &stats.sp_attack_ev.to_string(),
-                &stats.sp_attack_ev.to_string()
+                &evs.special_attack.to_string(),
+                &evs.special_attack.to_string()
             )
             .on_input(|input| Message::EVChanged(String::from("Sp. Atk"), input))
             .line_height(text::LineHeight::Absolute(10.into()))
             .width(35)
             .size(12),
             text_input(
-                &stats.sp_attack_iv.to_string(),
-                &stats.sp_attack_iv.to_string()
+                &ivs.special_attack.to_string(),
+                &ivs.special_attack.to_string()
             )
             .on_input(|input| Message::IVChanged(String::from("Sp. Atk"), input))
             .line_height(text::LineHeight::Absolute(10.into()))
@@ -382,20 +391,20 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
         .align_y(Alignment::Center),
         row![
             text("Sp. Def:").width(labels_width),
-            stat_bar(sp_defense as f32 * scale),
-            text(sp_defense),
+            stat_bar(computed.sp_defense as f32 * scale),
+            text(computed.sp_defense),
             iced::widget::Space::new().width(Length::Fill),
             text_input(
-                &stats.sp_defense_ev.to_string(),
-                &stats.sp_defense_ev.to_string()
+                &evs.special_defense.to_string(),
+                &evs.special_defense.to_string()
             )
             .on_input(|input| Message::EVChanged(String::from("Sp. Def"), input))
             .line_height(text::LineHeight::Absolute(10.into()))
             .width(35)
             .size(12),
             text_input(
-                &stats.sp_defense_iv.to_string(),
-                &stats.sp_defense_iv.to_string()
+                &ivs.special_defense.to_string(),
+                &ivs.special_defense.to_string()
             )
             .on_input(|input| Message::IVChanged(String::from("Sp. Def"), input))
             .line_height(text::LineHeight::Absolute(10.into()))
@@ -406,15 +415,15 @@ fn stats(stats: Stats, level: u8) -> Element<'static, Message> {
         .align_y(Alignment::Center),
         row![
             text("Speed:").width(labels_width),
-            stat_bar(speed as f32 * scale),
-            text(speed),
+            stat_bar(computed.speed as f32 * scale),
+            text(computed.speed),
             iced::widget::Space::new().width(Length::Fill),
-            text_input(&stats.speed_ev.to_string(), &stats.speed_ev.to_string())
+            text_input(&evs.speed.to_string(), &evs.speed.to_string())
                 .on_input(|input| Message::EVChanged(String::from("Speed"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(35)
                 .size(12),
-            text_input(&stats.speed_iv.to_string(), &stats.speed_iv.to_string())
+            text_input(&ivs.speed.to_string(), &ivs.speed.to_string())
                 .on_input(|input| Message::IVChanged(String::from("Speed"), input))
                 .line_height(text::LineHeight::Absolute(10.into()))
                 .width(30)
@@ -495,13 +504,22 @@ fn pokemon_info_typing(
 
 fn info_moves(
     moves: Vec<(String, String, u8, u8)>,
+    all_moves: Vec<String>,
     images: &HashMap<String, image::Handle>,
 ) -> Element<'static, Message> {
     let mut column = column![];
     let len = moves.len();
 
     for (index, (typing, name, pp_used, pp)) in moves.into_iter().enumerate() {
-        column = column.push(move_slot(index, &typing, &name, pp_used, pp, images));
+        column = column.push(move_slot(
+            index,
+            &typing,
+            &name,
+            pp_used,
+            pp,
+            all_moves.clone(),
+            images,
+        ));
     }
 
     for i in 0..4_u8.saturating_sub(len as u8) {
@@ -526,10 +544,11 @@ fn info_moves(
 
 pub fn pokemon_info<'a>(
     state: &'a iced::widget::combo_box::State<String>,
-    pokemon: &Pokemon,
+    pokemon: &AnyPokemon,
+    game_data: &AnyGameData,
     images: &HashMap<String, image::Handle>,
 ) -> Element<'a, Message> {
-    let label = info_label(pokemon, images);
+    let label = info_label(pokemon, game_data, images);
 
     let dex_species_lang = row![
         text(format!("No. {}", pokemon.nat_dex_number())),
@@ -542,7 +561,7 @@ pub fn pokemon_info<'a>(
         .width(130)
         .input_style(text_input_default),
         iced::widget::Space::new().width(Length::Fill),
-        text(pokemon.language().to_string()),
+        text(pokemon.language()),
         iced::widget::Space::new().width(45),
     ]
     .spacing(20)
@@ -571,7 +590,7 @@ pub fn pokemon_info<'a>(
         row![
             text("PID").color(color!(0xffcc00)),
             iced::widget::Space::new().width(30),
-            text(format!("{:X}", pokemon.personality_value))
+            text(format!("{:X}", pokemon.personality_value()))
         ]
         .width((WINDOW_WIDTH * 0.33) / 2.0)
         .align_y(Alignment::Center),
@@ -626,7 +645,8 @@ pub fn pokemon_info<'a>(
     .padding([5, 15])
     .style(pokemon_info_appearance);
 
-    let item_id = item_id(&pokemon.item()).unwrap_or_default();
+    let held_item = pokemon.held_item().unwrap_or_default();
+    let item_id = game_data.item_sprite_id(&held_item).unwrap_or_default();
 
     let item_image =
         if let Some(handle) = images.get(&format!("item_{:0width$}", item_id, width = 4)) {
@@ -635,12 +655,7 @@ pub fn pokemon_info<'a>(
             image("").height(30)
         };
 
-    let held_items = match held_items() {
-        Ok(is) => is,
-        Err(_) => {
-            vec![String::from("")]
-        }
-    };
+    let held_items = game_data.held_items().unwrap_or_default();
 
     let item = container(
         row![
@@ -648,7 +663,7 @@ pub fn pokemon_info<'a>(
             iced::widget::Space::new().width(5),
             item_image,
             iced::widget::Space::new().width(5),
-            pick_list(held_items, Some(pokemon.item()), Message::HeldItemSelected)
+            pick_list(held_items, Some(held_item), Message::HeldItemSelected)
                 .width(150)
                 .style(pick_list_default),
             iced::widget::Space::new().width(Length::Fill),
@@ -661,14 +676,23 @@ pub fn pokemon_info<'a>(
     .align_x(iced::alignment::Horizontal::Left)
     .padding([5, 15]);
 
-    let moves = info_moves(pokemon.moves(), images);
+    let all_moves = game_data.moves().unwrap_or_default();
+    let moves = info_moves(
+        pokemon
+            .moves()
+            .into_iter()
+            .map(|m| (m.move_type, m.name, m.pp_used, m.pp))
+            .collect(),
+        all_moves,
+        images,
+    );
 
     container(column![
         label,
         dex_species_lang,
         pokemon_info_typing(pokemon.typing(), images),
         iced::widget::Space::new().width(10),
-        stats(pokemon.stats, pokemon.level()),
+        stats(pokemon.computed_stats(), pokemon.ivs(), pokemon.evs()),
         iced::widget::Space::new().width(10),
         ot,
         pid_friendship,

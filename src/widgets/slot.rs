@@ -20,7 +20,7 @@ use iced::Point;
 use iced::{color, event, mouse, touch};
 use iced::{Background, Color, Element, Event, Length, Rectangle, Shadow, Size, Theme, Vector};
 
-use pk_edit::Pokemon;
+use pk_edit::{AnyPokemon, PokemonTrait};
 
 use crate::widgets::{gender, level};
 
@@ -54,7 +54,7 @@ where
 
 /// Creates a 240 × 80 party slot widget.
 pub fn party_slot<'a, Message: 'a + Clone, Theme, Renderer>(
-    pk_data: Option<&Pokemon>,
+    pk_data: Option<&AnyPokemon>,
     handle: Option<iced::advanced::image::Handle>,
 ) -> Slot<'a, Message, Theme, Renderer>
 where

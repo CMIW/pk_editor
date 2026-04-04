@@ -42,11 +42,10 @@ use iced::widget::Container;
 use iced::widget::{button, text_input};
 use iced::widget::{container, image, pick_list, row, text};
 use iced::{Alignment, Element};
-use pk_edit::save::storage::Pocket;
+use pk_edit::Gen3Pocket as Pocket;
 
 use crate::pick_list_default;
 use crate::theme::{input_appearance, level_appearance};
-use pk_edit::misc::moves;
 
 pub fn move_slot(
     index: usize,
@@ -54,6 +53,7 @@ pub fn move_slot(
     move_name: &str,
     pp_used: u8,
     pp_total: u8,
+    all_moves: Vec<String>,
     images: &HashMap<String, image::Handle>,
 ) -> Element<'static, pokemon_info::Message> {
     let move_icon = image(images.get(&format!("{}_icon_SV", move_type)).unwrap_or({
@@ -64,18 +64,10 @@ pub fn move_slot(
         &image::Handle::from_rgba(width, height, pixels)
     }))/*.width(45).height(45)*/;
 
-    let moves = match moves() {
-        Ok(ms) => ms,
-        Err(err) => {
-            println!("{}", err);
-            vec![String::from("")]
-        }
-    };
-
     container(
         row![
             move_icon,
-            pick_list(moves, Some(move_name.to_string()), move |selection| {
+            pick_list(all_moves, Some(move_name.to_string()), move |selection| {
                 pokemon_info::Message::MoveSelected(index, selection)
             })
             .width(160)
@@ -94,7 +86,7 @@ pub fn move_slot(
 }
 
 fn pp(pp_used: u8, pp_total: u8) -> Container<'static, pokemon_info::Message> {
-    container(text(format!("{}/{}", pp_used, pp_total)))
+    container(text(format!("{}/{}", pp_total.saturating_sub(pp_used), pp_total)))
         .width(60)
         .height(30.0)
         .align_y(iced::alignment::Vertical::Center)

@@ -20,16 +20,17 @@ use crate::DragState;
 use crate::Message;
 use crate::{widgets::party, widgets::pc_box};
 
-use pk_edit::Pokemon;
+use pk_edit::{AnyGameData, AnyPokemon};
 
 pub fn party_box<'a>(
     cb_state: &'a iced::widget::combo_box::State<String>,
     selected: &Option<Id>,
     selected_tab: &Option<Id>,
-    selected_pokemon: &Option<Pokemon>,
-    party_list: &'a [Pokemon],
+    selected_pokemon: &Option<AnyPokemon>,
+    game_data: &AnyGameData,
+    party_list: &'a [AnyPokemon],
     pc_i: &usize,
-    pc_list: &'a [Pokemon],
+    pc_list: &'a [AnyPokemon],
     images: &HashMap<String, image::Handle>,
     drag: &Option<DragState>,
 ) -> Element<'a, Message> {
@@ -45,7 +46,7 @@ pub fn party_box<'a>(
         ]
         .spacing(15),
         if let Some(selected_pokemon) = selected_pokemon {
-            pokemon_info(cb_state, selected_pokemon, images).map(Message::PokemonInfo)
+            pokemon_info(cb_state, selected_pokemon, game_data, images).map(Message::PokemonInfo)
         } else {
             container("").into()
         },
