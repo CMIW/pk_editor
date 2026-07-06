@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-06
+
+### Added
+
+#### `pk_editor`
+
+- Gender editing support (previously read-only)
+- Ability editing support (previously read-only)
+- UI scaling — all slot sizes, spacing, and widget dimensions scale with window width
+- `itertools` dependency for `chunks()` iterator in PC box grid rendering
+
+### Changed
+
+#### `pk_edit`
+
+- Upgraded to `pk_edit` v0.5.0 — see its changelog for full details
+- `pk_edit::PokemonTrait::lowest_level()` removed; use `GameData::lowest_level(dex_num)` instead
+- `pokemon_info::update()` now takes `&AnyGameData` for level/clamp queries
+- `pokemon_info::view()` takes `scale: f32` for responsive layout
+- `PokemonFactory::gen_pokemon_from_species()` now takes `&AnyPokemon` (the existing slot) as first arg
+- `match_wild_err_arm` lint removed from `Cargo.toml`
+
+#### `pk_editor`
+
+- `pokemon_info::update()` signature expanded with `game_data` parameter
+- `PartyBoxes` screen passes `scale` factor to `party()`, `pc_box()`, and `pokemon_info()` views
+- `pc_box()` uses `itertools::Itertools::chunks()` for cleaner 6-column grid rendering
+- All hardcoded pixel widths replaced with `width * scale` throughout PC, party, and info widgets
+- `WINDOW_WIDTH`/`WINDOW_HEIGHT` removed from `pokemon_info.rs` imports
+- `PokemonInfo` panel height changed from `WINDOW_HEIGHT` to `Length::Fill`
+- Various `as u8` casts replaced with `u8::try_from(...).unwrap_or(0)` for clippy compliance
+
+### Fixed
+
+- `gen_pokemon_from_species` now passes `&selected_pokemon` to preserve slot offset when generating a new Pokémon in an existing slot
+
 ## [0.4.0] - 2026-04-04
 
 ### Added
