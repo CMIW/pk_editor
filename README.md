@@ -204,4 +204,4 @@ cargo doc --open --manifest-path core/pk_edit/Cargo.toml   # core library
 
 ## License
 
-This project does not currently include a license file. All rights reserved by the author unless stated otherwise.
+Licensed under [0BSD](LICENSE).
