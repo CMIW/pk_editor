@@ -162,11 +162,13 @@ impl State {
             Message::PokemonInfo(message) => {
                 if let Some(ref save_file) = self.save_file {
                     let factory = save_file.pokemon_factory();
+                    let game_data = save_file.game_data();
                     let ot_name = save_file.trainer_name();
                     let ot_id = save_file.trainer_id();
                     if let Err(error) = pokemon_info::update(
                         &mut self.selected_pokemon,
                         &factory,
+                        &game_data,
                         &ot_name,
                         ot_id,
                         message,
@@ -385,6 +387,9 @@ impl State {
             .map(|s| s.game_data())
             .unwrap_or_default();
 
+        let scale = (WINDOW_WIDTH + 50.0) / 1130.0;
+        let scale = scale.max(1.0);
+
         let content = container(match self.screen {
             Some(Screen::PartyBoxes) => party_box(
                 &self.cb_state,
@@ -397,6 +402,7 @@ impl State {
                 &self.current_pc,
                 &self.images,
                 &self.drag,
+                scale,
             ),
             Some(Screen::BagTrainer) => bag(
                 &self.selected_bag,

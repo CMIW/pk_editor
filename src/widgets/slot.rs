@@ -99,6 +99,7 @@ where
     id: Option<Id>,
     width: f32,
     height: f32,
+    scale: f32,
     is_selected: bool,
     status: Option<Status>,
     class: Theme::Class<'a>,
@@ -141,6 +142,7 @@ where
             id: None,
             width,
             height,
+            scale: 1.0,
             on_press: None,
             on_drop: None,
             on_drag_start: None,
@@ -150,6 +152,12 @@ where
             status: Some(Status::Idle),
             class: <Theme as Catalog>::default(),
         }
+    }
+
+    /// Set a uniform scale for this slot (1.0 = default size)
+    pub fn scale(mut self, scale: f32) -> Self {
+        self.scale = scale.max(0.0);
+        self
     }
 
     /// Sets the widget ID, used for selection tracking.
@@ -226,8 +234,8 @@ where
 {
     fn size(&self) -> Size<Length> {
         Size {
-            width: self.width.into(),
-            height: self.height.into(),
+            width: (self.width * self.scale).into(),
+            height: (self.height * self.scale).into(),
         }
     }
 
@@ -253,7 +261,10 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let size = Size::new(self.width, self.height);
+        // current base size times scale
+        let w = self.width * self.scale;
+        let h = self.height * self.scale;
+        let size = Size::new(w, h);
 
         match self.kind {
             SlotKind::Pc => layout::Node::with_children(
@@ -263,15 +274,18 @@ where
                     .layout(
                         &mut tree.children[0],
                         renderer,
-                        &limits.width(self.width - 10.0).height(self.height - 10.0),
+                        &limits
+                            .width(w - 10.0 * self.scale)
+                            .height(h - 10.0 * self.scale),
                     )
                     .align(iced::Alignment::Center, iced::Alignment::Center, size)],
             ),
             SlotKind::Party => {
+                let img_size = h;
                 let mut img = self.children[0].as_widget_mut().layout(
                     &mut tree.children[0],
                     renderer,
-                    &limits.width(self.height).height(self.height),
+                    &limits.width(img_size).height(img_size),
                 );
                 let mut lv = self.children[1].as_widget_mut().layout(
                     &mut tree.children[1],
@@ -290,19 +304,25 @@ where
                 );
 
                 img = img.align(iced::Alignment::End, iced::Alignment::Center, size);
-                img.move_to_mut(img.bounds().position() + Vector::new(-10.0, 0.0));
+                img.move_to_mut(img.bounds().position() + Vector::new(-10.0 * self.scale, 0.0));
 
                 lv = lv.align(iced::Alignment::Start, iced::Alignment::Start, size);
                 let lv_size = lv.size();
-                lv.move_to_mut(lv.bounds().position() + Vector::new(20.0, 10.0));
+                lv.move_to_mut(
+                    lv.bounds().position() + Vector::new(20.0 * self.scale, 10.0 * self.scale),
+                );
 
                 name = name.align(iced::Alignment::Start, iced::Alignment::Start, size);
                 name.move_to_mut(
-                    name.bounds().position() + Vector::new(20.0, 20.0 + lv_size.height),
+                    name.bounds().position()
+                        + Vector::new(20.0 * self.scale, 20.0 * self.scale + lv_size.height),
                 );
 
                 gnd = gnd.align(iced::Alignment::Start, iced::Alignment::Start, size);
-                gnd.move_to_mut(gnd.bounds().position() + Vector::new(30.0 + lv_size.width, 10.0));
+                gnd.move_to_mut(
+                    gnd.bounds().position()
+                        + Vector::new(30.0 * self.scale + lv_size.width, 10.0 * self.scale),
+                );
 
                 layout::Node::with_children(size, vec![img, lv, name, gnd])
             }

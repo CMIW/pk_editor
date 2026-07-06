@@ -13,7 +13,7 @@ Supports **Linux** and **Windows**. Work in progress — unexpected crashes may 
 - [x] Generate new Pokémon (produces illegal Pokémon — use at your own risk)
 - [x] Edit species
 - [x] Edit level
-- [x] Edit nature *(partially implemented)*
+- [x] Edit nature
 - [x] Edit friendship
 - [x] Edit held item
 - [x] Edit moves (up to 4)
@@ -21,8 +21,8 @@ Supports **Linux** and **Windows**. Work in progress — unexpected crashes may 
 - [x] Edit Pokérus status (None / Infected / Cured)
 - [x] Edit Pokéball
 - [ ] Edit nickname
-- [ ] Edit gender
-- [ ] Edit ability
+- [x] Edit gender
+- [x] Edit ability
 
 ### Trainer & Bag
 - [x] Edit trainer bag (Items, Pokéballs, Berries, TMs, Key Items)

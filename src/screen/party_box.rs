@@ -22,6 +22,8 @@ use crate::{widgets::party, widgets::pc_box};
 
 use pk_edit::{AnyGameData, AnyPokemon};
 
+const SPACING: f32 = 15.0;
+
 pub fn party_box<'a>(
     cb_state: &'a iced::widget::combo_box::State<String>,
     selected: &Option<Id>,
@@ -33,24 +35,28 @@ pub fn party_box<'a>(
     pc_list: &'a [AnyPokemon],
     images: &HashMap<String, image::Handle>,
     drag: &Option<DragState>,
+    scale: f32,
 ) -> Element<'a, Message> {
+    let info_w = 330.0 * scale;
+
     row![
         column![
             menu_bar::view(selected_tab, images).map(Message::MenuBar),
             row![
-                iced::widget::Space::new().width(5.0),
+                iced::widget::Space::new().width(5.0 * scale),
                 party(selected, party_list, images, drag),
-                pc_box(selected, pc_i, pc_list, images, drag)
+                pc_box(selected, pc_i, pc_list, images, drag, scale)
             ]
-            .spacing(15),
+            .spacing(SPACING * scale),
         ]
-        .spacing(15),
+        .spacing(SPACING * scale),
         if let Some(selected_pokemon) = selected_pokemon {
-            pokemon_info(cb_state, selected_pokemon, game_data, images).map(Message::PokemonInfo)
+            pokemon_info(cb_state, selected_pokemon, game_data, images, scale)
+                .map(Message::PokemonInfo)
         } else {
-            container("").into()
+            container("").width(info_w).into()
         },
     ]
-    .spacing(15)
+    .spacing(SPACING * scale)
     .into()
 }

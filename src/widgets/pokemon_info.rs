@@ -32,7 +32,6 @@ use widgets::generic_overlay::dropdown_root;
 
 use std::collections::HashMap;
 
-use crate::misc::{WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::theme::{info_label_appearance, pokeball_picker_apperance, pokemon_info_appearance};
 use crate::widgets::input_level;
 
@@ -40,6 +39,10 @@ use crate::stat_bar;
 use crate::widgets::gender;
 use crate::widgets::move_slot;
 use crate::{pick_list_default, text_input_default};
+
+fn w(width: f32) -> iced::Length {
+    iced::Length::Fixed(width)
+}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -59,6 +62,7 @@ pub enum Message {
 pub fn update(
     selected_pokemon: &mut Option<AnyPokemon>,
     factory: &AnyFactory,
+    game_data: &AnyGameData,
     ot_name: &str,
     ot_id: TrainerID,
     message: Message,
@@ -90,13 +94,13 @@ pub fn update(
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 value.retain(|c| c.is_numeric());
                 if let Ok(number) = value.parse::<u64>() {
-                    let lowest_level = selected_pokemon.lowest_level();
+                    let lowest_level = game_data.lowest_level(selected_pokemon.nat_dex_number());
                     let value = if number > 100 {
                         100
                     } else if number < lowest_level as u64 {
                         lowest_level
                     } else {
-                        number as u8
+                        u8::try_from(number).unwrap_or(0)
                     };
                     selected_pokemon.set_level(value)?;
                 }
@@ -106,8 +110,12 @@ pub fn update(
         Message::SpeciesSelected(species) => {
             if let Some(selected_pokemon) = selected_pokemon.as_mut() {
                 if selected_pokemon.is_empty() {
-                    *selected_pokemon =
-                        factory.gen_pokemon_from_species(&species, ot_name, ot_id)?;
+                    *selected_pokemon = factory.gen_pokemon_from_species(
+                        &selected_pokemon,
+                        &species,
+                        ot_name,
+                        ot_id,
+                    )?;
                 } else {
                     selected_pokemon.set_species(&species)?;
                 }
@@ -143,7 +151,7 @@ pub fn update(
                     let value = if number > u8::MAX.into() {
                         u8::MAX
                     } else {
-                        number as u8
+                        u8::try_from(number).unwrap_or(0)
                     };
                     selected_pokemon.set_friendship(value)?;
                 }
@@ -181,6 +189,7 @@ fn info_label(
     pokemon: &AnyPokemon,
     game_data: &AnyGameData,
     images: &HashMap<String, image::Handle>,
+    width: f32,
 ) -> Element<'static, Message> {
     let pokeball = if pokemon.pokeball_caught() == 0 {
         dropdown_root("", "")
@@ -216,7 +225,9 @@ fn info_label(
                                     .width(45)
                                     .height(45),
                             )
-                            .on_press(Message::ChangePokeball(*x as u8))
+                            .on_press(Message::ChangePokeball(
+                                u8::try_from(*x).unwrap_or_default(),
+                            ))
                             .style(button::subtle)
                             .into(),
                         )
@@ -278,7 +289,7 @@ fn info_label(
     .padding([5, 20]); // top, right, bottom, left
 
     container(row)
-        .width(WINDOW_WIDTH * 0.33)
+        .width(w(width))
         .height(50.0)
         .style(info_label_appearance)
         .align_y(iced::alignment::Vertical::Center)
@@ -286,7 +297,12 @@ fn info_label(
         .into()
 }
 
-fn stats(computed: ComputedStats, ivs: StatBlock, evs: StatBlock) -> Element<'static, Message> {
+fn stats(
+    computed: ComputedStats,
+    ivs: StatBlock,
+    evs: StatBlock,
+    width: f32,
+) -> Element<'static, Message> {
     let highest_stat = [
         computed.hp,
         computed.attack,
@@ -435,16 +451,17 @@ fn stats(computed: ComputedStats, ivs: StatBlock, evs: StatBlock) -> Element<'st
     .padding([0, 10]) // top/bottom left/right
     .spacing(5);
 
-    container(column).width(WINDOW_WIDTH * 0.33).into()
+    container(column).width(w(width)).into()
 }
 
 fn pokemon_info_typing(
     typing: Option<(String, Option<String>)>,
     images: &HashMap<String, image::Handle>,
+    width: f32,
 ) -> Element<'static, Message> {
     match typing {
         None => container("")
-            .width(WINDOW_WIDTH * 0.33)
+            .width(w(width))
             .height(40.0)
             .style(pokemon_info_appearance)
             .align_y(iced::alignment::Vertical::Center)
@@ -460,10 +477,10 @@ fn pokemon_info_typing(
                     let pixels = vec![0u8; size * 4];
                     &image::Handle::from_rgba(width, height, pixels)
                 }))
-                .width((WINDOW_WIDTH * 0.33) * 0.33);
+                .width(width * 0.33);
 
                 container(row![type1].spacing(5))
-                    .width(WINDOW_WIDTH * 0.33)
+                    .width(w(width))
                     .height(40.0)
                     .style(pokemon_info_appearance)
                     .align_y(iced::alignment::Vertical::Center)
@@ -479,7 +496,7 @@ fn pokemon_info_typing(
                     let pixels = vec![0u8; size * 4];
                     &image::Handle::from_rgba(width, height, pixels)
                 }))
-                .width((WINDOW_WIDTH * 0.33) * 0.33);
+                .width(width * 0.33);
                 let type2 = image(images.get(&format!("{}IC_SV", type2)).unwrap_or({
                     let width = 10;
                     let height = 10;
@@ -487,10 +504,10 @@ fn pokemon_info_typing(
                     let pixels = vec![0u8; size * 4];
                     &image::Handle::from_rgba(width, height, pixels)
                 }))
-                .width((WINDOW_WIDTH * 0.33) * 0.33);
+                .width(width * 0.33);
 
                 container(row![type1, type2].spacing(5))
-                    .width(WINDOW_WIDTH * 0.33)
+                    .width(w(width))
                     .height(40.0)
                     .style(pokemon_info_appearance)
                     .align_y(iced::alignment::Vertical::Center)
@@ -506,6 +523,7 @@ fn info_moves(
     moves: Vec<(String, String, u8, u8)>,
     all_moves: Vec<String>,
     images: &HashMap<String, image::Handle>,
+    width: f32,
 ) -> Element<'static, Message> {
     let mut column = column![];
     let len = moves.len();
@@ -522,19 +540,19 @@ fn info_moves(
         ));
     }
 
-    for i in 0..4_u8.saturating_sub(len as u8) {
+    for i in 0..4_u8.saturating_sub(u8::try_from(len).unwrap_or(0)) {
         let position = i as usize + len;
         let row = row![button(text("+").center())
             .on_press(Message::AddMove(position))
-            .width(270),]
-        .width(WINDOW_WIDTH * 0.33)
+            .width(width),]
+        .width(w(width))
         .padding([5, 15])
         .align_y(Alignment::Center);
         column = column.push(row);
     }
 
     container(column)
-        .width(WINDOW_WIDTH * 0.33)
+        .width(w(width))
         .height(160)
         .style(pokemon_info_appearance)
         .align_y(iced::alignment::Vertical::Center)
@@ -547,8 +565,10 @@ pub fn pokemon_info<'a>(
     pokemon: &AnyPokemon,
     game_data: &AnyGameData,
     images: &HashMap<String, image::Handle>,
+    scale: f32,
 ) -> Element<'a, Message> {
-    let label = info_label(pokemon, game_data, images);
+    let width = 330.0 * scale;
+    let label = info_label(pokemon, game_data, images, width);
 
     let dex_species_lang = row![
         text(format!("No. {}", pokemon.nat_dex_number())),
@@ -578,8 +598,8 @@ pub fn pokemon_info<'a>(
         iced::widget::Space::new().width(10),
         text(pokemon.ot_name()),
     ]
-    .width((WINDOW_WIDTH * 0.33) / 2.0),])
-    .width(WINDOW_WIDTH * 0.33)
+    .width(width / 2.0),])
+    .width(w(width))
     .height(40.0)
     .align_y(iced::alignment::Vertical::Center)
     .align_x(iced::alignment::Horizontal::Left)
@@ -592,7 +612,7 @@ pub fn pokemon_info<'a>(
             iced::widget::Space::new().width(30),
             text(format!("{:X}", pokemon.personality_value()))
         ]
-        .width((WINDOW_WIDTH * 0.33) / 2.0)
+        .width(width / 2.0)
         .align_y(Alignment::Center),
         row![
             text("Friendship").color(color!(0xffcc00)),
@@ -606,9 +626,9 @@ pub fn pokemon_info<'a>(
             .line_height(text::LineHeight::Absolute(10.into()))
             .size(12),
         ]
-        .width((WINDOW_WIDTH * 0.33) / 2.0),
+        .width(width / 2.0),
     ])
-    .width(WINDOW_WIDTH * 0.33)
+    .width(w(width))
     .height(40.0)
     .align_y(iced::alignment::Vertical::Center)
     .align_x(iced::alignment::Horizontal::Left)
@@ -628,7 +648,7 @@ pub fn pokemon_info<'a>(
         ]
         .height(40.0)
         .align_y(iced::alignment::Vertical::Center)
-        .width((WINDOW_WIDTH * 0.33) / 2.0),
+        .width(width / 2.0),
         row![
             text("Ability").color(color!(0xffcc00)),
             iced::widget::Space::new().width(15),
@@ -636,9 +656,9 @@ pub fn pokemon_info<'a>(
         ]
         .height(40.0)
         .align_y(iced::alignment::Vertical::Center)
-        .width((WINDOW_WIDTH * 0.33) / 2.0),
+        .width(width / 2.0),
     ])
-    .width(WINDOW_WIDTH * 0.33)
+    .width(w(width))
     .height(40.0)
     .align_y(iced::alignment::Vertical::Center)
     .align_x(iced::alignment::Horizontal::Left)
@@ -670,7 +690,7 @@ pub fn pokemon_info<'a>(
         ]
         .align_y(Alignment::Center),
     )
-    .width(WINDOW_WIDTH * 0.33)
+    .width(w(width))
     .height(40.0)
     .align_y(iced::alignment::Vertical::Center)
     .align_x(iced::alignment::Horizontal::Left)
@@ -685,14 +705,20 @@ pub fn pokemon_info<'a>(
             .collect(),
         all_moves,
         images,
+        width,
     );
 
     container(column![
         label,
         dex_species_lang,
-        pokemon_info_typing(pokemon.typing(), images),
+        pokemon_info_typing(pokemon.typing(), images, width),
         iced::widget::Space::new().width(10),
-        stats(pokemon.computed_stats(), pokemon.ivs(), pokemon.evs()),
+        stats(
+            pokemon.computed_stats(),
+            pokemon.ivs(),
+            pokemon.evs(),
+            width
+        ),
         iced::widget::Space::new().width(10),
         ot,
         pid_friendship,
@@ -701,8 +727,8 @@ pub fn pokemon_info<'a>(
         moves,
         row![].height(30)
     ])
-    .width(WINDOW_WIDTH * 0.33)
-    .height(WINDOW_HEIGHT)
+    .width(w(width))
+    .height(iced::Length::Fill)
     .style(pokemon_info_appearance)
     .align_y(iced::alignment::Vertical::Top)
     .align_x(iced::alignment::Horizontal::Center)

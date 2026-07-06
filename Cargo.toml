@@ -15,6 +15,7 @@ pk_edit = { path = "core/pk_edit"}
 widgets = {git = "https://github.com/A-Disruption/widgets.git"}
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+itertools = "0.14.0"
 
 [patch.crates-io]
 #iced = { git = "https://github.com/iced-rs/iced", branch = "master" }
@@ -41,7 +42,7 @@ indexing_slicing = "deny"
 #float_arithmetic = "deny" # If precision is critical (optional)
 cast_possible_truncation = "deny"
 cast_precision_loss = "deny"
-match_wild_err_arm = "deny"
+#match_wild_err_arm = "deny"
 
 # Performance
 large_futures = "warn"

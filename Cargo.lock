@@ -3658,7 +3658,7 @@ dependencies = [
 
 [[package]]
 name = "pk_edit"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -3680,6 +3680,7 @@ dependencies = [
  "iced",
  "iced_fontello",
  "include_dir",
+ "itertools",
  "pk_edit",
  "rfd",
  "thiserror 2.0.17",
