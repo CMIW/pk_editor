@@ -1,7 +1,7 @@
 # pk_editor
 
-A Pokémon Generation III save file editor built with [Iced](https://docs.rs/iced/latest/iced/).
-Provides utilities to view and modify save files from Pokémon games: **Ruby**, **Sapphire**, **Emerald**, **FireRed**, and **LeafGreen**.
+A multi-generation Pokémon save file editor built with [Iced](https://docs.rs/iced/latest/iced/).
+Provides utilities to view and modify save files from Pokémon games: **Ruby**, **Sapphire**, **Emerald**, **FireRed**, **LeafGreen** (Gen III), and **Brilliant Diamond**, **Shining Pearl** (Gen VIII — planned).
 
 Supports **Linux** and **Windows**. Work in progress — unexpected crashes may occur.
 
@@ -130,56 +130,44 @@ overlay containers (`color!(0x000000, 0.5)`), rounded borders, and drop shadows 
 
 ### Core Library (`core/pk_edit/`)
 
-A standalone Rust library for reading and writing Generation III save data.
+A multi-generation Pokémon save file editing library using a generation-agnostic trait
+system with per-generation module implementations.
 
 ```
 core/pk_edit/src/
-├── lib.rs              # Public API re-exports
-├── error.rs            # PokemonError / SaveDataError types
+├── lib.rs              # Public API, dispatch enums (AnyPokemon, AnyGameData, AnyFactory),
+│                          open() entry point, save file detection
+├── error.rs            # PokemonError / SaveDataError / DetectError types
 ├── misc.rs             # SQLite database helpers and game data lookups
 ├── common/
-│   └── character_set.rs  # Gen III character encoding ↔ Unicode
-├── pokemon/
-│   ├── entity.rs       # Pokemon struct (100-byte party / 80-byte PC format)
-│   ├── data.rs         # Sub-structures: Growth, Attacks, EVs, Misc blocks + bitfields
-│   ├── factory.rs      # Pokemon generation (Method 1 RNG, gen_pokemon_from_species)
-│   ├── crypto.rs       # XOR encryption and 16-bit checksum
-│   └── stats.rs        # Stat calculation (base + IV + EV + nature modifier)
-└── save/
-    ├── mod.rs          # SaveFile struct — top-level save management
-    ├── section.rs      # 14-section save structure, SectionID enum, checksums
-    ├── trainer.rs      # Trainer, TrainerID, TimePlayed, GameVersion, GymBadges
-    ├── storage.rs      # StorageType (Party/PC), Pocket enum, pocket encryption
-    └── pc.rs           # PCBuffer — 9 sections stitched into 14 × 30-slot PC
+│   └── types.rs        # Shared types: TrainerID, Gender, StatBlock, Move, etc.
+├── traits/
+│   ├── pokemon.rs      # Pokemon trait (34 methods)
+│   ├── game_data.rs    # GameData trait (SQLite-backed queries)
+│   ├── save_file.rs    # SaveFile trait
+│   └── pokemon_factory.rs  # PokemonFactory trait
+├── gen3/               # Generation III implementation
+│   ├── game_data.rs
+│   ├── pokemon/        # Gen3Pokemon, Gen3Factory, crypto
+│   └── save/           # SaveFile, sections, trainer, PC, storage
+├── bdsp/               # Gen VIII BDSP implementation (planned)
+└── lumi/               # Luminescent Platinum implementation (planned)
 ```
 
 #### Save File Format
 
-Gen III saves contain two 57,344-byte blocks (A and B) each divided into **14 sections** of
-4,096 bytes. The active block is determined by the save index counter. Sections are identified
-by `SectionID` and hold trainer info, party data, PC buffers, and bag pockets. Pocket data and
-Pokémon sub-structures are XOR-encrypted using a 32-bit security key derived from the trainer ID.
+Each generation has its own save layout. Gen III saves contain two 57,344-byte blocks (A and B)
+each divided into **14 sections** of 4,096 bytes, with XOR encryption using a security key
+derived from the trainer ID. Other generations use different formats (e.g., BDSP uses a
+single 0xE9828–0xEF0A4 byte buffer with 4-block shuffle + XOR encryption per Pokémon).
 
 #### Pokémon Data Layout
 
-Each Pokémon is stored as 100 bytes (party) or 80 bytes (PC):
-
-| Bytes | Content |
-|---|---|
-| 0–3 | Personality value (PID) |
-| 4–7 | Original trainer ID (public + secret) |
-| 8–17 | Nickname (Gen III character encoding) |
-| 18–19 | Language |
-| 20–27 | OT name |
-| 28 | Pokérus status |
-| 29 | Pokéball / met location |
-| 30–31 | Origins info (bitfield) |
-| 32–35 | IVs / egg / ability (bitfield) |
-| 36–47 | Ribbons and obedience (bitfield) |
-| 48–79 | Encrypted sub-structure (Growth + Attacks + EVs + Misc) |
-| 80–99 | Party data (stats, current HP, condition — not encrypted) |
-
-The order of the four sub-structures is determined by `PID % 24` (one of 24 permutations).
+Pokémon data layout varies by generation:
+- **Gen III**: 100 bytes (party) / 80 bytes (PC), four encrypted sub-structures ordered
+  by `PID % 24`.
+- **Gen VIII (BDSP/Lumi)**: 0x158 bytes (party) / 0x148 bytes (stored), 4-block shuffle
+  (ordered by `(EncryptionConstant >> 13) & 31`) + XOR with LCG, UTF-16LE strings.
 
 #### Game Data
 
@@ -195,11 +183,11 @@ SQLite database (`pk_edit.db`) extracted at startup via `pk_edit::misc::extract_
 | [iced 0.14](https://docs.rs/iced) | GUI framework (Elm architecture) |
 | [tokio](https://docs.rs/tokio) | Async file I/O |
 | [rfd](https://docs.rs/rfd) | Native file open / save dialogs |
-| [thiserror](https://docs.rs/thiserror) | Ergonomic error type derivation |
 | [include_dir](https://docs.rs/include_dir) | Embed assets folder at compile time |
-| [pk_edit](core/pk_edit) | Gen III save file parsing (local) |
-| [byteorder](https://docs.rs/byteorder) | Endian-aware integer I/O |
+| [pk_edit](core/pk_edit) | Multi-gen save file parsing library (local) |
 | [rusqlite](https://docs.rs/rusqlite) | Bundled SQLite for game data |
+| [byteorder](https://docs.rs/byteorder) | Endian-aware integer I/O |
+| [serde](https://docs.rs/serde) | Serialization for data export |
 | [modular-bitfield](https://docs.rs/modular-bitfield) | Bitfield structs for Pokémon data |
 | [lcg-rand](https://docs.rs/lcg-rand) | LCG RNG for Method 1 PID/IV generation |
 
